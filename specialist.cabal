@@ -1,0 +1,33 @@
+cabal-version:      3.4
+name:               specialist
+version:            0.1.0
+synopsis:
+    GHC plugin that detects and instruments overloaded function applications
+    to get information about them during runtime.
+license:            GPL-3.0-or-later
+license-file:       LICENSE
+author:             Finley McIlwaine
+maintainer:         finley@well-typed.com
+copyright:          (c) Well-Typed LLP 2023
+category:           GHC
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+
+common common
+    ghc-options: -Wall
+    default-language: Haskell2010
+    default-extensions:
+      RecordWildCards
+      LambdaCase
+
+library
+    import: common
+    hs-source-dirs: src
+    exposed-modules:
+        GHC.Specialist
+        GHC.Specialist.Types
+        GHC.Specialist.Wrapper
+    build-depends:
+        base >=4.18.0.0 && < 5
+      , ghc
+      , mtl
