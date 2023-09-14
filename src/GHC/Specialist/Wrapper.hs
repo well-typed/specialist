@@ -1,5 +1,5 @@
-{-# LANGUAGE MagicHash          #-}
 {-# LANGUAGE ImpredicativeTypes #-}
+{-# LANGUAGE MagicHash          #-}
 
 module GHC.Specialist.Wrapper where
 
@@ -13,8 +13,8 @@ import Unsafe.Coerce
 -- | The function that is injected by the Specialist plugin to wrap all
 -- overloaded function applications.
 {-# NOINLINE specialistWrapper' #-}
-specialistWrapper'
-  :: Addr#
+specialistWrapper' :: forall a b.
+     Addr#
   -- ^ Address of some basic information about the application
   -> (a -> b)
   -- ^ The overloaded function
@@ -44,5 +44,5 @@ specialistWrapper' metaAddr f d = unsafePerformIO $ do
     outFile = "specialist-notes.txt"
 
 {-# NOINLINE specialistWrapper #-}
-specialistWrapper :: Addr# -> (a => b) -> (a => b)
+specialistWrapper :: forall a b. Addr# -> (a => b) -> (a => b)
 specialistWrapper = unsafeCoerce specialistWrapper'
