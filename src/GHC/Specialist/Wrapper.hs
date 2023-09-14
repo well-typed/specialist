@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MagicHash          #-}
 {-# LANGUAGE ImpredicativeTypes #-}
 
 module GHC.Specialist.Wrapper where
