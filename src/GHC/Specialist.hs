@@ -202,8 +202,7 @@ processExpr = \case
 
         -- Get the wrapper function
         wrapperId <- lift $ do
-          -- mName <- thNameToGhcName 'specialistWrapper' -- Changes behavior of wrapper, we lose access to the dictionary
-          mName <- thNameToGhcName 'specialistWrapper
+          mName <- thNameToGhcName 'specialistWrapper'
           case mName of
             Just n -> lookupId n
             Nothing -> error "Specialist plugin failed to obtain the wrapper function"

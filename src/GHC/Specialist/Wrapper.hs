@@ -12,6 +12,7 @@ import Unsafe.Coerce
 
 -- | The function that is injected by the Specialist plugin to wrap all
 -- overloaded function applications.
+{-# NOINLINE specialistWrapper' #-}
 specialistWrapper'
   :: Addr#
   -- ^ Address of some basic information about the application
@@ -42,5 +43,6 @@ specialistWrapper' metaAddr f d = unsafePerformIO $ do
   where
     outFile = "specialist-notes.txt"
 
+{-# NOINLINE specialistWrapper #-}
 specialistWrapper :: Addr# -> (a => b) -> (a => b)
 specialistWrapper = unsafeCoerce specialistWrapper'
