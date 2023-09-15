@@ -8,9 +8,10 @@ import GHC.InfoProv
 
 data SpecialistNote =
     SpecialistNote
-      { specialistNoteFunctionInfoProv :: Maybe InfoProv
-      , specialistNoteInstanceInfoProv :: Maybe InfoProv
+      { specialistNoteFunctionId :: String
+      , specialistNoteSourceSpan :: String
       , specialistNoteMeta :: String
+      , specialistNoteInstanceInfoProv :: Maybe InfoProv
       }
   deriving (Show, Read, Eq)
 

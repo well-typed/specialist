@@ -10,39 +10,47 @@ import GHC.InfoProv
 import GHC.IO (unsafePerformIO)
 import Unsafe.Coerce
 
--- | The function that is injected by the Specialist plugin to wrap all
+-- | The function that is injected by the Specialist plugin to instrument
 -- overloaded function applications.
 {-# NOINLINE specialistWrapper' #-}
-specialistWrapper' :: forall a b.
+specialistWrapper' :: forall a.
      Addr#
-  -- ^ Address of some basic information about the application
-  -> (a -> b)
-  -- ^ The overloaded function
+  -- ^ Address of a String which is a unique identifier for this application
+  -> Addr#
+  -- ^ Address of the String which is the serialised RealSrcSpan from the most
+  -- recent source note by this application
+  -> Addr#
+  -- ^ Address of some serialised metadata about the application
   -> a
   -- ^ The dictionary used for the overloaded call
-  -> b
-specialistWrapper' metaAddr f d = unsafePerformIO $ do
+  -> ()
+specialistWrapper' fIdAddr ssAddr metaAddr d = unsafePerformIO $ do
     -- This should result in the source location of the instance definition
     -- being used for the overloaded function
     dIpe <- whereFrom d
 
-    -- This should be the definition site of the function being applied
-    fIpe <- whereFrom f
-
     -- Unpack the meta information string
-    let meta = unpackCString# metaAddr
+    let
+      fId = unpackCString# fIdAddr
+      ss = unpackCString# ssAddr
+      meta = unpackCString# metaAddr
 
     appendFile outFile . (++ "\n") . show $
       SpecialistNote
-        { specialistNoteFunctionInfoProv = fIpe
-        , specialistNoteInstanceInfoProv = dIpe
+        { specialistNoteFunctionId = fId
+        , specialistNoteSourceSpan = ss
         , specialistNoteMeta = meta
+        , specialistNoteInstanceInfoProv = dIpe
         }
 
-    return (f d)
+    return ()
   where
     outFile = "specialist-notes.txt"
 
 {-# NOINLINE specialistWrapper #-}
-specialistWrapper :: forall a b. Addr# -> (a => b) -> (a => b)
+specialistWrapper :: forall a.
+     Addr#
+  -> Addr#
+  -> Addr#
+  -> (a => ())
 specialistWrapper = unsafeCoerce specialistWrapper'

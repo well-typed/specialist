@@ -2,6 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
 module GHC.Specialist where
@@ -10,10 +11,14 @@ import GHC.Specialist.Wrapper
 
 import GHC.Core
 import GHC.Core.Predicate
+import GHC.Core.TyCo.Rep (Scaled (..))
 import GHC.Plugins
+import GHC.Types.Tickish
 import GHC.Types.TyThing
 
+import Data.List (find)
 import Control.Monad.Reader
+import Control.Monad.State.Strict
 
 -------------------------------------------------------------------------------
 -- Plugin definition and installation
@@ -27,7 +32,7 @@ plugin =
           let
             specialistEnv = parseSpecialistOpts opts
           in
-            runSpecialist specialistEnv (install todos)
+            runSpecialist specialistEnv emptySpecialistState (install todos)
       }
 
 -- | Install Specialist at the end of the core-to-core passes.
@@ -53,7 +58,7 @@ specialist = do
           "Starting Specialist plugin on module: " ++ currentModuleString
 
         -- Process all top-level binders in the core program
-        mg_binds' <- runSpecialist specialistEnv $ mapM processBind mg_binds
+        mg_binds' <- runSpecialist specialistEnv emptySpecialistState $ mapM processBind mg_binds
 
         return $ mgs { mg_binds = mg_binds' }
 
@@ -69,25 +74,40 @@ parseSpecialistOpts opts =
 
 data SpecialistEnv =
     SpecialistEnv
-      { specialistEnvVerbosity :: Verbosity
+      { specialistEnvVerbosity :: !Verbosity
+      }
+
+data SpecialistState =
+    SpecialistState
+      { specialistStateLastSourceNote :: !(Maybe (RealSrcSpan, LexicalFastString))
+      }
+
+emptySpecialistState :: SpecialistState
+emptySpecialistState =
+    SpecialistState
+      { specialistStateLastSourceNote = Nothing
       }
 
 data Verbosity = Silent | Verbose
 
-newtype SpecialistT m a = SpecialistT { runSpecialistT :: ReaderT SpecialistEnv m a }
+newtype SpecialistT m a = SpecialistT { runSpecialistT :: ReaderT SpecialistEnv (StateT SpecialistState m) a }
   deriving
     ( Functor
     , Applicative
     , Monad
     , MonadReader SpecialistEnv
-    , MonadTrans
+    , MonadState SpecialistState
     )
+
 deriving instance (MonadIO m) => MonadIO (SpecialistT m)
+
+instance MonadTrans SpecialistT where
+  lift act = SpecialistT (lift $ lift act)
 
 type SpecialistM = SpecialistT CoreM
 
-runSpecialist :: SpecialistEnv -> SpecialistT m a -> m a
-runSpecialist env (SpecialistT run) = runReaderT run env
+runSpecialist :: Monad m => SpecialistEnv -> SpecialistState -> SpecialistT m a -> m a
+runSpecialist env s (SpecialistT run) = evalStateT (runReaderT run env) s
 
 
 -------------------------------------------------------------------------------
@@ -105,8 +125,8 @@ processBind = \case
 
 -- | This is where most of the work happens. If the expression is an
 -- application, we determine whether the function being applied is specialised
--- or not. If it is not specialised, we modify the application by wrapping the
--- applied function with a reporting\/logging function.
+-- or not. If it is overloaded, we modify the application by wrapping it in a
+-- case statement that does some logging\/reporting when evaluated.
 processExpr :: CoreExpr -> SpecialistM CoreExpr
 processExpr = \case
     -- The only case we really care about: Function application
@@ -116,58 +136,56 @@ processExpr = \case
       -- arguments. To determine if the `f` is an overloaded function (i.e. not
       -- specialised), we check if any of the arguments v1 ... vN are
       -- dictionaries.
-      --
-      -- We also attempt to avoid instrumenting a dictionary function, which may
-      -- be overloaded if there are superclasses, by checking if the result type
-      -- of the function is a dictionary type.
+      let
+        (f, xs) = collectArgs app
+        resultTy = applyTypeToArgs empty (exprType f) xs
 
       -- We recursively process the arguments first so we don't have to traverse
       -- the modified expression if it is overloaded.
-      let (f, xs) = collectArgs app
+      oldS <- get
       args <- mapM processExpr xs
+      put oldS
 
       if
-           -- Any of the arguments are dictionaries
+           -- Check if any of the arguments are dictionaries
            any isDictExpr args
 
-           -- This function is not itself a dictionary constructor
-           -- (avoid instrumenting e.g. $fShowList)
-        && not (isDictTy (applyTypeToArgs empty (exprType f) args))
+           -- Attempt to avoid instrumenting dictionary functions, which may be
+           -- overloaded if there are superclasses, by checking if the result
+           -- type of the function is a dictionary type.
+        && not (isDictTy resultTy)
+
+           -- Avoid instrumenting constraint selectors like eq_sel (TODO: Write
+           -- more about how these constraints occur. See tests/T3.hs)
+        && (typeTypeOrConstraint resultTy /= ConstraintLike)
       then do
         slog "\n\nAn application expression appears to be overloaded"
         slog "Application:"
         slogS app
 
-        -- At least one of the arguments is a dictionary, and the function is
-        -- not a dictionary constructor/selector. So now we know our function
-        -- looks something like this:
+        -- We now know:
+        --   1. At least one of the arguments is a dictionary
+        --   2. The function is not a dictionary constructor/selector
+        --   3. The function is not a constraint constructor/selector
+        --
+        -- So we know our function looks something like this:
         --
         --   f t1 ... tN a1 ... aM
         --
         -- Where t1 ... tN are type arguments, a1 ... aM are value arguments,
-        -- and one of a1 ... aM is a dictionary. NOTE: It should be impossible
-        -- for a dictionary argument to occur anywhere but as the first argument
-        -- to the function, since they are passed as constraints, but we handle
-        -- the general case here. Say the first dictionary argument to f is aX,
-        -- then we want to focus on:
-        --
-        -- f t1 ... tN a1 ... a(X-1)
-        --
-        -- As our "overloaded function".
-        --
-        -- The crux then is building a well-typed application that includes our
-        -- wrapper function:
-        --
-        --   specialist_wrapper tX tY m (f t1 ... tN a1 ... a(X-1)) aX ... aM
-        --
-        -- Where tX and tY are the type arguments to the wrapper function and m
-        -- is the metadata for this specific application. We need to build tX
-        -- and tY based on the type of the overloaded function.
-        --
-        -- Since specialist_wrapper :: String -> (a -> b) -> a -> b, a ~ tX
-        -- should be the type of the first value argument (the dictionary!) to
-        -- the overloaded function, and b ~ tY should be the type of the
-        -- function after having been partially applied to that value argument.
+        -- and one of a1 ... aM is a dictionary. NOTE: I think it should be
+        -- impossible for a dictionary argument to occur anywhere but as the
+        -- first argument to the function, since they are passed as constraints,
+        -- but we handle the general case here. Say the first dictionary
+        -- argument to f is aX, the crux then is building a well-typed
+        -- application that includes our wrapper function:
+
+        --   case specialistWrapper tX m1 m2 m3 aX of
+        --     () -> f t1 ... tN a1 ... aM
+
+        -- Where tX is the type argument to the wrapper function and m1, m2, m3
+        -- is the metadata for this specific application. tX must be the type of
+        -- the dictionary for this application.
 
         let
           -- Split the arguments into the type arguments and value arguments.
@@ -178,27 +196,19 @@ processExpr = \case
         slogS tyArgs
         slog "Application value args:"
         slogS valArgs
+        slog "Application result type:"
+        slogS resultTy
 
         let
-          -- Take the longest prefix of value arguments that are not
-          -- dictionaries. preDictVals is a1 ... a(X-1) above and dictVals is aX
-          -- ... aM above.
-          --
-          -- Invariant: isDictExpr (head dictVals) == True.
-          (preDictVals, dictVals) = break isDictExpr valArgs
+          -- Extract the dictionary argument
+          dictArg =
+            case find isDictExpr valArgs of
+              Just expr -> expr
+              Nothing -> error "Specialist could not locate a dictionary argument in an overloaded application (impossible?)"
 
-          -- Apply f to its type arguments and any non-dictionary value
-          -- arguments (f t1 ... tN a1 ... a(X-1))
-          f' = mkCoreApps f (tyArgs ++ preDictVals)
-
-          -- Create the type arguments for the wrapper function (the type of the
-          -- first dictionary value argument to the overloaded function, and the
-          -- type of the overloaded function partially applied to the first
-          -- value argument)
-          (tX, tY) =
-            case dictVals of
-              (a:_) -> (exprType a, exprType (mkCoreApp empty f' a))
-              _ -> error "Specialist plugin found an overloaded function application with no value arguments (impossible?)"
+          -- Create the type argument for the wrapper function (the type of the
+          -- first dictionary value argument to the overloaded function)
+          tX = exprType dictArg
 
         -- Get the wrapper function
         wrapperId <- lift $ do
@@ -207,13 +217,37 @@ processExpr = \case
             Just n -> lookupId n
             Nothing -> error "Specialist plugin failed to obtain the wrapper function"
 
-        -- This could be anything deemed useful
-        let metaStr = mkStringLit "test metadata"
+        -- Info arguments for the wrapper
+        (ss, l) <-
+          gets specialistStateLastSourceNote >>=
+            \case
+              Just (ss, LexicalFastString l) -> do
+                dflags <- lift getDynFlags
+                return $ (showSDoc dflags (ppr ss), unpackFS l)
+              Nothing -> return ("", "")
+        let
+          fIdStr = mkStringLit l
+          ssStr = mkStringLit ss
+          metaStr = mkStringLit "test metadata"
 
         let
-          wrappedApp =
+          wrapperApp =
             mkCoreApps
-              (mkCoreApps (Var wrapperId) [Type tX, Type tY, metaStr, f']) dictVals
+              (Var wrapperId)
+              [ Type tX
+              , fIdStr
+              , ssStr
+              , metaStr
+              , dictArg
+              ]
+
+          wrappedApp =
+            mkWildCase
+              wrapperApp
+              (Scaled OneTy (exprType wrapperApp))
+              resultTy
+              [ Alt (DataAlt unitDataCon) [] (mkCoreApps f args)
+              ]
 
         slog "Wrapped application:"
         slogS wrappedApp
@@ -236,7 +270,10 @@ processExpr = \case
       <*> mapM processAlt alts
     Cast e co ->
       mkCast <$> processExpr e <*> pure co
-    Tick t e ->
+    Tick t e -> do
+      -- If the tick is a SourceNote, track it as a potential source position
+      -- for upcoming applications
+      trackSourceNote t
       mkTick t <$> processExpr e
 
     -- For non-recursive constructors of Expr, we do nothing
@@ -244,6 +281,11 @@ processExpr = \case
 
 processAlt :: CoreAlt -> SpecialistM CoreAlt
 processAlt (Alt c bs e) = Alt c bs <$> processExpr e
+
+trackSourceNote :: CoreTickish -> SpecialistM ()
+trackSourceNote = \case
+    SourceNote !ss !l -> put (SpecialistState (Just (ss,l)))
+    _ -> return ()
 
 -------------------------------------------------------------------------------
 -- Utility functions
