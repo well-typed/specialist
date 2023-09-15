@@ -201,6 +201,7 @@ processExpr = \case
         --   1. At least one of the arguments is a dictionary
         --   2. The function is not a dictionary constructor/selector
         --   3. The function is not a constraint constructor/selector
+        --   4. The function is not a join point
         --
         -- So we know our function looks something like this:
         --

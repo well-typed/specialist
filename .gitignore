@@ -1,5 +1,6 @@
 dist-newstyle
 .envrc
+**/*.eventlog
 **/specialist-notes.txt
 test/*
 !test/**.hs

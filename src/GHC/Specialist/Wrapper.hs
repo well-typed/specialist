@@ -5,6 +5,7 @@ module GHC.Specialist.Wrapper where
 
 import GHC.Specialist.Types
 
+import Debug.Trace
 import GHC.Exts
 import GHC.InfoProv
 import GHC.IO (unsafePerformIO)
@@ -41,7 +42,7 @@ specialistWrapper' fIdAddr lAddr ssAddr f d = unsafePerformIO $ do
       ss = unpackCString# ssAddr
       l = unpackCString# lAddr
 
-    appendFile outFile . (++ "\n") . show $
+    traceEventIO . show $
       SpecialistNote
         { specialistNoteId = fId
         , specialistNoteLocationLabel = l
@@ -49,10 +50,6 @@ specialistWrapper' fIdAddr lAddr ssAddr f d = unsafePerformIO $ do
         , specialistNoteFunctionIpe = fIpe
         , specialistNoteInstanceIpe = dIpe
         }
-
-    return ()
-  where
-    outFile = "specialist-notes.txt"
 
 {-# NOINLINE specialistWrapper #-}
 specialistWrapper :: forall a r (b :: TYPE r).
