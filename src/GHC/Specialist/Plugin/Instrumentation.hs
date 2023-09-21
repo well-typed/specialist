@@ -1,7 +1,7 @@
 {-# LANGUAGE ImpredicativeTypes #-}
 {-# LANGUAGE MagicHash          #-}
 
-module GHC.Specialist.Wrapper where
+module GHC.Specialist.Plugin.Instrumentation where
 
 import GHC.Specialist.Types
 

@@ -2,8 +2,8 @@ cabal-version:      3.4
 name:               specialist
 version:            0.1.0
 synopsis:
-    GHC plugin that detects and instruments overloaded function applications
-    to get information about them during runtime.
+  GHC plugin that detects and instruments overloaded function applications
+  to get information about them during runtime.
 license:            GPL-3.0-or-later
 license-file:       LICENSE
 author:             Finley McIlwaine
@@ -14,20 +14,34 @@ build-type:         Simple
 extra-doc-files:    CHANGELOG.md
 
 common common
-    ghc-options: -Wall
-    default-language: GHC2021
-    default-extensions:
-      RecordWildCards
-      LambdaCase
+  ghc-options: -Wall
+  default-language: GHC2021
+  default-extensions:
+    RecordWildCards
+    LambdaCase
+  build-depends:
+      base >=4.18.0.0 && < 5
 
 library
-    import: common
-    hs-source-dirs: src
-    exposed-modules:
-        GHC.Specialist
-        GHC.Specialist.Types
-        GHC.Specialist.Wrapper
-    build-depends:
-        base >=4.18.0.0 && < 5
-      , ghc
-      , mtl
+  import: common
+  hs-source-dirs: src
+  exposed-modules:
+      GHC.Specialist
+      GHC.Specialist.Analyze
+      GHC.Specialist.Plugin
+      GHC.Specialist.Plugin.Compat
+      GHC.Specialist.Plugin.Instrumentation
+      GHC.Specialist.Types
+  build-depends:
+      ghc
+    , ghc-events
+    , mtl
+    , text
+
+executable specialyze
+  import: common
+  hs-source-dirs: exe
+  main-is: Main.hs
+  build-depends:
+      specialist
+    , ghc-events
