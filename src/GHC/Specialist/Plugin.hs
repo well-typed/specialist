@@ -178,11 +178,10 @@ processExpr = \case
           -- function that will be passed to the wrapper for analysis.
           f' = mkCoreApps f (tyArgs ++ preDictArgs)
 
-          -- Create the type arguments for the wrapper function (the type of the
-          -- first dictionary value argument to the overloaded function, and the
-          -- type of the overloaded function partially applied to the
-          -- pre-dctionary args)
-          (ta, tb) = (exprType dictArg, exprType (mkCoreApp empty f' dictArg))
+          -- Create the type arguments for the wrapper function that
+          -- representing the type of the overloaded function partially applied
+          -- to the pre-dictionary args)
+          tz = exprType (mkCoreApp empty f' dictArg)
 
         slog "Application type args:"
         slogS tyArgs
@@ -191,25 +190,22 @@ processExpr = \case
         slog "Application result type:"
         slogS resultTy
 
-        -- Get an expression of type @IO (Maybe InfoProv)@, just to call 'exprType'
-        getDictIpeTypeId <- lift $ do
-          mName <- thNameToGhcName 'getDictIpeTypeDUMMY
-          case mName of
-            Just n -> lookupId n
-            Nothing -> error "Specialist plugin failed to obtain the getDictIpeTypeDUMMY function"
+        -- Get the wrapper function, and create the first type variable
+        -- arguments to the wrapper function, which are the types of up to 5
+        -- dictionary arguments
+        (wrapperId, dictTypes, dicts') <- lift $ do
+          mName <-
+            case length dicts of
+              0 -> error "Specialist plugin found and overloaded application with 0 dictionaries (impossible?)"
+              1 -> thNameToGhcName 'specialistWrapper1
+              2 -> thNameToGhcName 'specialistWrapper2
+              3 -> thNameToGhcName 'specialistWrapper3
+              4 -> thNameToGhcName 'specialistWrapper4
+              _ -> thNameToGhcName 'specialistWrapper5
 
-        -- Get the 'whereFromWrapper' function
-        whereFromId <- lift $ do
-          mName <- thNameToGhcName 'whereFromWrapper
+          let (ts, ds) = unzip [(Type $ exprType d, d) | d <- take 5 dicts]
           case mName of
-            Just n -> lookupId n
-            Nothing -> error "Specialist plugin failed to obtain the whereFromWrapper function"
-
-        -- Get the wrapper function
-        wrapperId <- lift $ do
-          mName <- thNameToGhcName 'specialistWrapper
-          case mName of
-            Just n -> lookupId n
+            Just n -> lookupId n >>= \i -> return (i, ts, ds)
             Nothing -> error "Specialist plugin failed to obtain the wrapper function"
 
         -- Info arguments for the wrapper
@@ -230,17 +226,15 @@ processExpr = \case
         let
           wrapperApp =
             mkCoreApps
-              (Var wrapperId)
-              [ Type ta
-              , Type (getRuntimeRep tb)
-              , Type tb
-              , fIdStr
-              , lStr
-              , ssStr
-              , f'
-              , mkListExpr (exprType (Var getDictIpeTypeId)) $
-                  map (\d -> mkCoreApps (Var whereFromId) [Type $ exprType d, d]) dicts
-              ]
+              (Var wrapperId) $
+                dictTypes ++
+                  [ Type (getRuntimeRep tz)
+                  , Type tz
+                  , fIdStr
+                  , lStr
+                  , ssStr
+                  , f'
+                  ] ++ dicts'
 
           wrappedApp =
             mkWildCase
