@@ -35,6 +35,7 @@ library
   build-depends:
       ghc
     , ghc-events
+    , ghc-heap
     , mtl
     , text
 

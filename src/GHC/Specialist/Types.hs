@@ -16,7 +16,7 @@ import GHC.Plugins
 data SpecialistNote =
     SpecialistNote
       { specialistNoteId :: String
-      , specialistNoteInstanceIpe :: [Maybe InfoProv]
+      , specialistNoteDictInfos :: [DictInfo]
       , specialistNoteFunctionIpe :: Maybe InfoProv
       , specialistNoteLocationLabel :: String
       , specialistNoteLocationSpan :: String
@@ -25,6 +25,13 @@ data SpecialistNote =
 
 -- This should probably just be derived in GHC
 deriving instance Read InfoProv
+
+data DictInfo =
+    DictInfo
+      { dictInfoProv :: Maybe InfoProv
+      , dictInfoFreeDicts :: Maybe [DictInfo]
+      }
+  deriving (Show, Read, Eq)
 
 -------------------------------------------------------------------------------
 -- Monad definition

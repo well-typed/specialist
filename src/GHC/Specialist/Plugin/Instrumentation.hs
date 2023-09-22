@@ -9,9 +9,20 @@ import GHC.Specialist.Types
 
 import Debug.Trace
 import GHC.Exts
+import GHC.Exts.Heap
 import GHC.InfoProv
 import GHC.IO (unsafePerformIO)
 import Unsafe.Coerce
+
+getDictInfo :: forall a. a -> IO DictInfo
+getDictInfo d =
+    DictInfo <$> whereFrom d <*> do
+      getClosureData d >>=
+        \case
+          ConstrClosure _ ptrs _ _ _ _ -> do
+            Just <$> mapM (\(Box fd) -> getDictInfo fd) ptrs
+          _ ->
+            return Nothing
 
 {-# NOINLINE specialistWrapper1' #-}
 specialistWrapper1' :: forall a r (z :: TYPE r).
@@ -26,7 +37,7 @@ specialistWrapper1' fIdAddr lAddr ssAddr f d =
         SpecialistNote
           <$> pure (unpackCString# fIdAddr)
           <*> sequence
-                [ whereFrom d
+                [ getDictInfo d
                 ]
           <*> whereFrom f
           <*> pure (unpackCString# lAddr)
@@ -53,8 +64,8 @@ specialistWrapper2' fIdAddr lAddr ssAddr f d1 d2 =
         SpecialistNote
           <$> pure (unpackCString# fIdAddr)
           <*> sequence
-                [ whereFrom d1
-                , whereFrom d2
+                [ getDictInfo d1
+                , getDictInfo d2
                 ]
           <*> whereFrom f
           <*> pure (unpackCString# lAddr)
@@ -81,9 +92,9 @@ specialistWrapper3' fIdAddr lAddr ssAddr f d1 d2 d3 =
         SpecialistNote
           <$> pure (unpackCString# fIdAddr)
           <*> sequence
-                [ whereFrom d1
-                , whereFrom d2
-                , whereFrom d3
+                [ getDictInfo d1
+                , getDictInfo d2
+                , getDictInfo d3
                 ]
           <*> whereFrom f
           <*> pure (unpackCString# lAddr)
@@ -110,10 +121,10 @@ specialistWrapper4' fIdAddr lAddr ssAddr f d1 d2 d3 d4 =
         SpecialistNote
           <$> pure (unpackCString# fIdAddr)
           <*> sequence
-                [ whereFrom d1
-                , whereFrom d2
-                , whereFrom d3
-                , whereFrom d4
+                [ getDictInfo d1
+                , getDictInfo d2
+                , getDictInfo d3
+                , getDictInfo d4
                 ]
           <*> whereFrom f
           <*> pure (unpackCString# lAddr)
@@ -140,11 +151,11 @@ specialistWrapper5' fIdAddr lAddr ssAddr f d1 d2 d3 d4 d5 =
         SpecialistNote
           <$> pure (unpackCString# fIdAddr)
           <*> sequence
-                [ whereFrom d1
-                , whereFrom d2
-                , whereFrom d3
-                , whereFrom d4
-                , whereFrom d5
+                [ getDictInfo d1
+                , getDictInfo d2
+                , getDictInfo d3
+                , getDictInfo d4
+                , getDictInfo d5
                 ]
           <*> whereFrom f
           <*> pure (unpackCString# lAddr)
