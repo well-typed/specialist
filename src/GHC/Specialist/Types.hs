@@ -16,10 +16,10 @@ import GHC.Plugins
 data SpecialistNote =
     SpecialistNote
       { specialistNoteId :: String
+      , specialistNoteInstanceIpe :: [Maybe InfoProv]
+      , specialistNoteFunctionIpe :: Maybe InfoProv
       , specialistNoteLocationLabel :: String
       , specialistNoteLocationSpan :: String
-      , specialistNoteFunctionIpe :: Maybe InfoProv
-      , specialistNoteInstanceIpe :: [Maybe InfoProv]
       }
   deriving (Show, Read, Eq)
 
