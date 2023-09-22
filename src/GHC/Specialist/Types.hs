@@ -19,7 +19,7 @@ data SpecialistNote =
       , specialistNoteLocationLabel :: String
       , specialistNoteLocationSpan :: String
       , specialistNoteFunctionIpe :: Maybe InfoProv
-      , specialistNoteInstanceIpe :: Maybe InfoProv
+      , specialistNoteInstanceIpe :: [Maybe InfoProv]
       }
   deriving (Show, Read, Eq)
 

@@ -1,5 +1,7 @@
-{-# LANGUAGE ImpredicativeTypes #-}
-{-# LANGUAGE MagicHash          #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE ImpredicativeTypes  #-}
+{-# LANGUAGE MagicHash           #-}
 
 module GHC.Specialist.Plugin.Instrumentation where
 
@@ -25,16 +27,17 @@ specialistWrapper' :: forall a r (b :: TYPE r).
   -- recent source note by this application
   -> (a -> b)
   -- ^ The overloaded function
-  -> a
-  -- ^ The dictionary used for the overloaded call
+  -> [IO (Maybe InfoProv)]
+  -- ^ Computation that will get us the IPE info for the dictionaries used in
+  -- the application
   -> ()
-specialistWrapper' fIdAddr lAddr ssAddr f d = unsafePerformIO $ do
+specialistWrapper' fIdAddr lAddr ssAddr f mdIpes = unsafePerformIO $ do
     -- This should result in the source location of the overloaded function
     fIpe <- whereFrom f
 
-    -- This should result in the source location of the instance definition
-    -- being used for the overloaded function
-    dIpe <- whereFrom d
+    -- This should result in the source location of the instance definitions
+    -- being used in the overloaded call
+    dIpes <- sequence mdIpes
 
     -- Unpack the information strings
     let
@@ -48,7 +51,7 @@ specialistWrapper' fIdAddr lAddr ssAddr f d = unsafePerformIO $ do
         , specialistNoteLocationLabel = l
         , specialistNoteLocationSpan = ss
         , specialistNoteFunctionIpe = fIpe
-        , specialistNoteInstanceIpe = dIpe
+        , specialistNoteInstanceIpe = dIpes
         }
 
 {-# NOINLINE specialistWrapper #-}
@@ -57,5 +60,25 @@ specialistWrapper :: forall a r (b :: TYPE r).
   -> Addr#
   -> Addr#
   -> (a => b)
-  -> (a => ())
+  -> [IO (Maybe InfoProv)]
+  -> ()
 specialistWrapper = unsafeCoerce specialistWrapper'
+
+-- {-# NOINLINE whereFrom' #-}
+-- whereFrom' :: forall a. a ->  IO (Maybe InfoProv)
+-- whereFrom' x = do
+--     !ipePtr <- getIPE x
+--     if ipePtr == nullPtr then
+--       return Nothing
+--     else do
+--       return Nothing
+--       -- infoProv <- peekInfoProv (ipeProv ipePtr)
+--       -- return $ Just infoProv
+
+{-# NOINLINE whereFromWrapper #-}
+whereFromWrapper :: forall c. c => IO (Maybe InfoProv)
+whereFromWrapper = unsafeCoerce whereFrom
+
+{-# NOINLINE getDictIpeTypeDUMMY #-}
+getDictIpeTypeDUMMY :: IO (Maybe InfoProv)
+getDictIpeTypeDUMMY = error "I'm just here to be a Type, do not evaluate"

@@ -165,10 +165,13 @@ processExpr = \case
 
           -- Split the value arguments into those before the first dictionary
           -- argument and those after
-          (preDictArgs, dictArg, _) =
+          (preDictArgs, dictArg, postDictArgs) =
             case break isDictExpr valArgs of
               (_, []) -> error "Specialist found an overloaded application with no dictionary arguments (impossible?)"
               (pre, (dict:post)) -> (pre, dict, post)
+
+          -- All dictionaries used in the overloaded call
+          dicts = dictArg : filter isDictExpr postDictArgs
 
           -- Apply f to its type arguments and any non-dictionary value
           -- arguments (f t1 ... tN a1 ... a(X-1)). This is the overloaded
@@ -187,6 +190,20 @@ processExpr = \case
         slogS valArgs
         slog "Application result type:"
         slogS resultTy
+
+        -- Get an expression of type @IO (Maybe InfoProv)@, just to call 'exprType'
+        getDictIpeTypeId <- lift $ do
+          mName <- thNameToGhcName 'getDictIpeTypeDUMMY
+          case mName of
+            Just n -> lookupId n
+            Nothing -> error "Specialist plugin failed to obtain the getDictIpeTypeDUMMY function"
+
+        -- Get the 'whereFromWrapper' function
+        whereFromId <- lift $ do
+          mName <- thNameToGhcName 'whereFromWrapper
+          case mName of
+            Just n -> lookupId n
+            Nothing -> error "Specialist plugin failed to obtain the whereFromWrapper function"
 
         -- Get the wrapper function
         wrapperId <- lift $ do
@@ -221,7 +238,8 @@ processExpr = \case
               , lStr
               , ssStr
               , f'
-              , dictArg
+              , mkListExpr (exprType (Var getDictIpeTypeId)) $
+                  map (\d -> mkCoreApps (Var whereFromId) [Type $ exprType d, d]) dicts
               ]
 
           wrappedApp =
