@@ -71,7 +71,6 @@ mkSpecialistEnv opts =
               Silent
         }
 
-
 -------------------------------------------------------------------------------
 -- Plugin AST traversals
 -------------------------------------------------------------------------------
@@ -146,10 +145,10 @@ processExpr = \case
         --
         -- We want to transform this application into an expression like the
         -- following:
-
+        --
         --   case specialistWrapper ... of
         --     () -> f t1 ... tN a1 ... aM
-
+        --
         -- The difficult bit is building a well-typed scrutinee for the case
         -- expression, since the type arguments and value arguments to
         -- specialistWrapper need to be specially constructed for each

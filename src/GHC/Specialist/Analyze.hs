@@ -156,6 +156,10 @@ foldEventsSpecialistNotes fold f =
         Just note -> f acc note
         Nothing -> acc
 
+-------------------------------------------------------------------------------
+-- * Utilities
+-------------------------------------------------------------------------------
+
 -- | Extract a 'SpecialistNote' from an 'Event'
 specialistNoteFromEvent :: Event -> Maybe SpecialistNote
 specialistNoteFromEvent Event{..} =
