@@ -29,10 +29,11 @@ getDictInfo :: forall a. a -> IO (Maybe DictInfo)
 getDictInfo d = do
     getClosureData d >>=
         \case
-          ConstrClosure _ ptrs _ _ _ _ -> do
-            wf <- whereFrom d
-            frees <- catMaybes <$> mapM (\(Box fd) -> getDictInfo fd) ptrs
-            return $ Just $ DictInfo wf frees
+          ConstrClosure _ ptrs _ _ _ dcon_nm
+            | 'C':':':_ <- dcon_nm -> do
+              wf <- whereFrom d
+              frees <- catMaybes <$> mapM (\(Box fd) -> getDictInfo fd) ptrs
+              return $ Just $ DictInfo wf frees
           _ ->
             return Nothing
 
