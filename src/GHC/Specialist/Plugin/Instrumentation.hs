@@ -14,6 +14,16 @@ import GHC.InfoProv
 import GHC.IO (unsafePerformIO)
 import Unsafe.Coerce
 
+-- | Put a dictionary in a box
+{-# NOINLINE dictToBox #-}
+dictToBox :: forall c. Dict c -> Box
+dictToBox = unsafeCoerce
+
+-- | Put a dictionary for a constrain in a box
+mkBox :: forall a. a => Box
+mkBox = dictToBox (Dict @a)
+
+-- | Traverse free variables of a dictionary to determine the superclasses
 getDictInfo :: forall a. a -> IO DictInfo
 getDictInfo d =
     DictInfo <$> whereFrom d <*> do
@@ -24,147 +34,35 @@ getDictInfo d =
           _ ->
             return Nothing
 
-{-# NOINLINE specialistWrapper1' #-}
-specialistWrapper1' :: forall a r (z :: TYPE r).
+{-# NOINLINE specialistWrapper' #-}
+specialistWrapper' :: forall a r (b :: TYPE r).
      Addr#
   -> Addr#
   -> Addr#
-  -> (a -> z)
-  -> (a -> ())
-specialistWrapper1' fIdAddr lAddr ssAddr f d =
+  -> (a -> b)
+  -> [Box]
+  -> ()
+specialistWrapper' fIdAddr lAddr ssAddr f boxedDicts =
     unsafePerformIO $
       traceEventIO . show =<<
         SpecialistNote
           <$> pure (unpackCString# fIdAddr)
-          <*> sequence
-                [ getDictInfo d
-                ]
+          <*> mapM (\(Box d) -> getDictInfo d) boxedDicts
           <*> whereFrom f
           <*> pure (unpackCString# lAddr)
           <*> pure (unpackCString# ssAddr)
 
-specialistWrapper1 :: forall a r (z :: TYPE r).
+specialistWrapper :: forall a r (b :: TYPE r).
      Addr#
   -> Addr#
   -> Addr#
-  -> (a => z)
-  -> (a => ())
-specialistWrapper1 = unsafeCoerce specialistWrapper1'
+  -> (a => b)
+  -- ^ The overloaded function
+  -> [Box]
+  -- ^ 'Box'es holding the dictionaries used in the overloaded call
+  -> ()
+specialistWrapper = unsafeCoerce specialistWrapper'
 
-{-# NOINLINE specialistWrapper2' #-}
-specialistWrapper2' :: forall a b r (z :: TYPE r).
-     Addr#
-  -> Addr#
-  -> Addr#
-  -> (a -> z)
-  -> (a -> b -> ())
-specialistWrapper2' fIdAddr lAddr ssAddr f d1 d2 =
-    unsafePerformIO $
-      traceEventIO . show =<<
-        SpecialistNote
-          <$> pure (unpackCString# fIdAddr)
-          <*> sequence
-                [ getDictInfo d1
-                , getDictInfo d2
-                ]
-          <*> whereFrom f
-          <*> pure (unpackCString# lAddr)
-          <*> pure (unpackCString# ssAddr)
-
-specialistWrapper2 :: forall a b r (z :: TYPE r).
-     Addr#
-  -> Addr#
-  -> Addr#
-  -> (a => z)
-  -> (a => b => ())
-specialistWrapper2 = unsafeCoerce specialistWrapper2'
-
-{-# NOINLINE specialistWrapper3' #-}
-specialistWrapper3' :: forall a b c r (z :: TYPE r).
-     Addr#
-  -> Addr#
-  -> Addr#
-  -> (a -> z)
-  -> (a -> b -> c -> ())
-specialistWrapper3' fIdAddr lAddr ssAddr f d1 d2 d3 =
-    unsafePerformIO $
-      traceEventIO . show =<<
-        SpecialistNote
-          <$> pure (unpackCString# fIdAddr)
-          <*> sequence
-                [ getDictInfo d1
-                , getDictInfo d2
-                , getDictInfo d3
-                ]
-          <*> whereFrom f
-          <*> pure (unpackCString# lAddr)
-          <*> pure (unpackCString# ssAddr)
-
-specialistWrapper3 :: forall a b c r (z :: TYPE r).
-     Addr#
-  -> Addr#
-  -> Addr#
-  -> (a => z)
-  -> (a => b => c => ())
-specialistWrapper3 = unsafeCoerce specialistWrapper3'
-
-{-# NOINLINE specialistWrapper4' #-}
-specialistWrapper4' :: forall a b c d r (z :: TYPE r).
-     Addr#
-  -> Addr#
-  -> Addr#
-  -> (a -> z)
-  -> (a -> b -> c -> d -> ())
-specialistWrapper4' fIdAddr lAddr ssAddr f d1 d2 d3 d4 =
-    unsafePerformIO $
-      traceEventIO . show =<<
-        SpecialistNote
-          <$> pure (unpackCString# fIdAddr)
-          <*> sequence
-                [ getDictInfo d1
-                , getDictInfo d2
-                , getDictInfo d3
-                , getDictInfo d4
-                ]
-          <*> whereFrom f
-          <*> pure (unpackCString# lAddr)
-          <*> pure (unpackCString# ssAddr)
-
-specialistWrapper4 :: forall a b c d r (z :: TYPE r).
-     Addr#
-  -> Addr#
-  -> Addr#
-  -> (a => z)
-  -> (a => b => c => d => ())
-specialistWrapper4 = unsafeCoerce specialistWrapper4'
-
-{-# NOINLINE specialistWrapper5' #-}
-specialistWrapper5' :: forall a b c d e r (z :: TYPE r).
-     Addr#
-  -> Addr#
-  -> Addr#
-  -> (a -> z)
-  -> (a -> b -> c -> d -> e -> ())
-specialistWrapper5' fIdAddr lAddr ssAddr f d1 d2 d3 d4 d5 =
-    unsafePerformIO $
-      traceEventIO . show =<<
-        SpecialistNote
-          <$> pure (unpackCString# fIdAddr)
-          <*> sequence
-                [ getDictInfo d1
-                , getDictInfo d2
-                , getDictInfo d3
-                , getDictInfo d4
-                , getDictInfo d5
-                ]
-          <*> whereFrom f
-          <*> pure (unpackCString# lAddr)
-          <*> pure (unpackCString# ssAddr)
-
-specialistWrapper5 :: forall a b c d e r (z :: TYPE r).
-     Addr#
-  -> Addr#
-  -> Addr#
-  -> (a => z)
-  -> (a => b => c => d => e => ())
-specialistWrapper5 = unsafeCoerce specialistWrapper5'
+-- | Just here to call @exprType@ on
+boxTypeDUMMY :: Box
+boxTypeDUMMY = error "I'm just here to be a Type, do not evaluate"

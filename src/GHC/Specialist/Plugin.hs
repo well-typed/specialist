@@ -146,17 +146,17 @@ processExpr = \case
         -- We want to transform this application into an expression like the
         -- following:
         --
-        --   case specialistWrapper ... of
-        --     () -> f t1 ... tN a1 ... aM
+        --   case specialistWrapper ... of () -> f t1 ... tN a1 ... aM
         --
         -- The difficult bit is building a well-typed scrutinee for the case
         -- expression, since the type arguments and value arguments to
         -- specialistWrapper need to be specially constructed for each
         -- instrumented application.
         --
-        -- The wrapper function accepts the type of the dictionary and the type
-        -- of the overloaded function partially applied to all arguments up to
-        -- and including the first dictionary. We build these now.
+        -- The wrapper function accepts the type of the first dictionary
+        -- argument and the type of the overloaded function partially applied to
+        -- all arguments up to and including the first dictionary. We build
+        -- these now.
 
         let
           -- Split the arguments into the type arguments and value arguments.
@@ -181,7 +181,7 @@ processExpr = \case
           -- Create the type arguments for the wrapper function that
           -- representing the type of the overloaded function partially applied
           -- to the pre-dictionary args)
-          tz = exprType (mkCoreApp empty f' dictArg)
+          (ta, tb) = (exprType dictArg, exprType (mkCoreApp empty f' dictArg))
 
         slog "Application type args:"
         slogS tyArgs
@@ -190,23 +190,26 @@ processExpr = \case
         slog "Application result type:"
         slogS resultTy
 
-        -- Get the wrapper function, and create the first type variable
-        -- arguments to the wrapper function, which are the types of up to 5
-        -- dictionary arguments
-        (wrapperId, dictTypes, dicts') <- lift $ do
-          mName <-
-            case length dicts of
-              0 -> error "Specialist plugin found and overloaded application with 0 dictionaries (impossible?)"
-              1 -> thNameToGhcName 'specialistWrapper1
-              2 -> thNameToGhcName 'specialistWrapper2
-              3 -> thNameToGhcName 'specialistWrapper3
-              4 -> thNameToGhcName 'specialistWrapper4
-              _ -> thNameToGhcName 'specialistWrapper5
-
-          let (ts, ds) = unzip [(Type $ exprType d, d) | d <- take 5 dicts]
+        -- Get the wrapper function
+        wrapperId <- lift $ do
+          mName <- thNameToGhcName 'specialistWrapper
           case mName of
-            Just n -> lookupId n >>= \i -> return (i, ts, ds)
+            Just n -> lookupId n
             Nothing -> error "Specialist plugin failed to obtain the wrapper function"
+
+        -- Get the Box type
+        boxType <- lift $ do
+          mName <- thNameToGhcName 'boxTypeDUMMY
+          case mName of
+            Just n -> exprType . Var <$> lookupId n
+            Nothing -> error "Specialist plugin failed to obtain the box type"
+
+        -- Get the mkBox function
+        mkBoxId <- lift $ do
+          mName <- thNameToGhcName 'mkBox
+          case mName of
+            Just n -> lookupId n
+            Nothing -> error "Specialist plugin failed to obtain the Box type"
 
         -- Info arguments for the wrapper
         (ss, l) <-
@@ -227,14 +230,20 @@ processExpr = \case
           wrapperApp =
             mkCoreApps
               (Var wrapperId) $
-                dictTypes ++
-                  [ Type (getRuntimeRep tz)
-                  , Type tz
+                  [ Type ta
+                  , Type $ getRuntimeRep tb
+                  , Type tb
                   , fIdStr
                   , lStr
                   , ssStr
                   , f'
-                  ] ++ dicts'
+                  , mkListExpr boxType $
+                      map
+                        ( \d ->
+                            mkCoreApps (Var mkBoxId) [Type $ exprType d, d]
+                        )
+                        dicts
+                  ]
 
           wrappedApp =
             mkWildCase

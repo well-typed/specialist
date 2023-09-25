@@ -6,6 +6,7 @@ module GHC.Specialist.Types where
 
 import Control.Monad.Reader
 import Control.Monad.State.Strict
+import Data.Kind
 import GHC.InfoProv
 import GHC.Plugins
 
@@ -32,6 +33,9 @@ data DictInfo =
       , dictInfoFreeDicts :: Maybe [DictInfo]
       }
   deriving (Show, Read, Eq)
+
+data Dict (c :: Constraint) where
+    Dict :: forall c. c => Dict c
 
 -------------------------------------------------------------------------------
 -- Monad definition
