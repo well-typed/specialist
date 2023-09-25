@@ -17,7 +17,7 @@ import GHC.Plugins
 data SpecialistNote =
     SpecialistNote
       { specialistNoteId :: String
-      , specialistNoteDictInfos :: [DictInfo]
+      , specialistNoteDictInfos :: [Maybe DictInfo]
       , specialistNoteFunctionIpe :: Maybe InfoProv
       , specialistNoteLocationLabel :: String
       , specialistNoteLocationSpan :: String
@@ -30,7 +30,7 @@ deriving instance Read InfoProv
 data DictInfo =
     DictInfo
       { dictInfoProv :: Maybe InfoProv
-      , dictInfoFreeDicts :: Maybe [DictInfo]
+      , dictInfoFreeDicts :: [DictInfo]
       }
   deriving (Show, Read, Eq)
 

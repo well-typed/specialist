@@ -7,6 +7,7 @@ module GHC.Specialist.Plugin.Instrumentation where
 
 import GHC.Specialist.Types
 
+import Data.Maybe
 import Debug.Trace
 import GHC.Exts
 import GHC.Exts.Heap
@@ -24,13 +25,15 @@ mkBox :: forall a. a => Box
 mkBox = dictToBox (Dict @a)
 
 -- | Traverse free variables of a dictionary to determine the superclasses
-getDictInfo :: forall a. a -> IO DictInfo
-getDictInfo d =
-    DictInfo <$> whereFrom d <*> do
-      getClosureData d >>=
+getDictInfo :: forall a. a -> IO (Maybe DictInfo)
+getDictInfo d = do
+    getClosureData d >>=
         \case
-          ConstrClosure _ ptrs _ _ _ _ -> do
-            Just <$> mapM (\(Box fd) -> getDictInfo fd) ptrs
+          ConstrClosure _ ptrs _ _ _ dcon_nm
+            | 'C':':':_ <- dcon_nm -> do
+              wf <- whereFrom d
+              frees <- catMaybes <$> mapM (\(Box fd) -> getDictInfo fd) ptrs
+              return $ Just $ DictInfo wf frees
           _ ->
             return Nothing
 
