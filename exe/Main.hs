@@ -27,4 +27,7 @@ perish msg = do
 
 analysis :: FilePath -> IO ()
 analysis eventLogFile = do
-    print =<< specialistNotesFromEventLogFile eventLogFile
+    specialistNotesFromEventLogFile eventLogFile >>=
+      \case
+        Right notes -> mapM_ (putStrLn . show) notes
+        _ -> error "failed"
