@@ -1,10 +1,11 @@
-module GHC.Specialist.Analyze where
+module GHC.Specialist.Analysis where
 
 import GHC.Specialist.Types
 
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.List
+import Data.Maybe
 import Data.Text (unpack)
 import GHC.RTS.Events
 import Text.Read
@@ -155,6 +156,26 @@ foldEventsSpecialistNotes fold f =
       case specialistNoteFromEvent ev of
         Just note -> f acc note
         Nothing -> acc
+
+-------------------------------------------------------------------------------
+-- * Functions on 'SpecialistNote's
+-------------------------------------------------------------------------------
+
+eqById :: SpecialistNote -> SpecialistNote -> Bool
+eqById (SpecialistNote cid1 _ _ _ _) (SpecialistNote cid2 _ _ _ _) =
+    cid1 == cid2
+
+eqByDictInfos :: SpecialistNote -> SpecialistNote -> Bool
+eqByDictInfos (SpecialistNote _ dis1 _ _ _) (SpecialistNote _ dis2 _ _ _) =
+    fromMaybe False ((==) <$> sequence dis1 <*> sequence dis2)
+
+eqByFunctionIpe :: SpecialistNote -> SpecialistNote -> Bool
+eqByFunctionIpe (SpecialistNote _ _ fIpe1 _ _) (SpecialistNote _ _ fIpe2 _ _) =
+    fromMaybe False ((==) <$> fIpe1 <*> fIpe2)
+
+eqByLocationLabel :: SpecialistNote -> SpecialistNote -> Bool
+eqByLocationLabel (SpecialistNote _ _ _ l1 _) (SpecialistNote _ _ _ l2 _) =
+    l1 == l2
 
 -------------------------------------------------------------------------------
 -- * Utilities

@@ -1,33 +1,17 @@
 module Main where
 
-import GHC.Specialist.Analyze
+import Commands
 
-import System.Environment
-import System.Exit
+import Options.Applicative
 
 main :: IO ()
-main =
-    getArgs >>=
-      \case
-        (eventLogFile:_) ->
-          analysis eventLogFile
-        [] ->
-          perishUsage "expected an argument"
-
-perishUsage :: String -> IO ()
-perishUsage msg = do
-  putStrLn ("specialyze error: " ++ msg)
-  putStrLn "  usage: specialyze <eventlog>"
-  exitFailure
-
-perish :: String -> IO ()
-perish msg = do
-  putStrLn ("specialyze error: " ++ msg)
-  exitFailure
-
-analysis :: FilePath -> IO ()
-analysis eventLogFile = do
-    specialistNotesFromEventLogFile eventLogFile >>=
-      \case
-        Right notes -> mapM_ (putStrLn . show) notes
-        _ -> error "failed"
+main = do
+    execParser opts >>= uncurry interpretSpecialyzeCommand
+  where
+    opts :: ParserInfo (FilePath, SpecialyzeCommand)
+    opts =
+      info
+        (specialyzeCommand <**> helper)
+        (    header "specialyze"
+          <> progDesc "Analyze output from the specialist plugin"
+        )

@@ -27,7 +27,7 @@ library
   hs-source-dirs: src
   exposed-modules:
       GHC.Specialist
-      GHC.Specialist.Analyze
+      GHC.Specialist.Analysis
       GHC.Specialist.Plugin
       GHC.Specialist.Plugin.Compat
       GHC.Specialist.Plugin.Instrumentation
@@ -43,6 +43,10 @@ executable specialyze
   import: common
   hs-source-dirs: exe
   main-is: Main.hs
+  other-modules:
+      Commands
+    , Utils
   build-depends:
       specialist
     , ghc-events
+    , optparse-applicative
