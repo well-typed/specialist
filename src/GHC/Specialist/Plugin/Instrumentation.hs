@@ -50,8 +50,8 @@ specialistWrapper' :: forall a r (b :: TYPE r).
 specialistWrapper' fIdAddr lAddr ssAddr f boxedDicts =
     unsafePerformIO $ do
       -- Only emit about 1/100th of the times this path is executed
-      coin <- randomRIO @Int (1, 100)
-      when (coin == 42) $
+      coin <- (<0.01) <$> randomRIO @Double (0.0, 1.0)
+      when coin $
         traceEventIO . show =<<
           SpecialistNote (unpackCString# fIdAddr)
             <$> currentCallStack
