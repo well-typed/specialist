@@ -7,11 +7,6 @@ module GHC.Specialist.Analysis.TextFile where
 import GHC.Specialist.Plugin.Types
 
 import Control.Monad
-import Control.Monad.IO.Class
-import Data.List
-import Data.Maybe
-import Data.Text (unpack)
-import GHC.RTS.Events
 import System.Directory
 import Text.Read
 

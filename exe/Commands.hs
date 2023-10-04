@@ -26,8 +26,8 @@ specialyzeCommand =
         (,)
     <$> (eventLogFile <|> textFile)
     <*> subparser
-          (    command "list-notes" listNotesInfo
-            <> command "group-notes" groupNotesInfo
+          (    command "list" listNotesInfo
+            <> command "group" groupNotesInfo
           )
   where
     eventLogFile :: Parser (IO (Either String [SpecialistNote]))
@@ -41,7 +41,7 @@ specialyzeCommand =
     textFile :: Parser (IO (Either String [SpecialistNote]))
     textFile = specialistNotesFromFile <$>
       strOption
-        (    long "text-file"
+        (    long "text"
           <> metavar "FILE"
           <> help
                ( "Specify the location of a text file containing the " ++
@@ -144,22 +144,26 @@ interpretGroupNotesCommand :: IO (Either String [SpecialistNote]) -> GroupNotesO
 interpretGroupNotesCommand getNotes groupOn msep =
     getNotes >>=
       \case
-        Right notes ->
-          foldM_ go () $ grouper notes
+        Right notes@(n:_) ->
+          foldM_ go n $ sortBy comparison notes
+        Right [] -> return ()
         Left msg ->
           perish $ "failed to get specialist notes from the input: " ++ msg
   where
-    go :: () -> [SpecialistNote] -> IO ()
-    go () notes = do
-      mapM_ print notes
-      case msep of
-        Just sep -> putStrLn sep
-        Nothing -> return ()
+    go :: SpecialistNote -> SpecialistNote -> IO SpecialistNote
+    go prev n = do
+      case (comparison prev n, msep) of
+        (EQ, _) ->
+          return ()
+        (_, Just sep) ->
+          putStrLn sep
+        _ -> return ()
+      print n >> return n
 
-    grouper :: [SpecialistNote] -> [[SpecialistNote]]
-    grouper =
+    comparison :: SpecialistNote -> SpecialistNote -> Ordering
+    comparison =
       case groupOn of
-        GroupNotesOnId -> groupBy eqById
-        GroupNotesOnDictInfos -> groupBy eqByDictInfos
-        GroupNotesOnFunctionIpe -> groupBy eqByFunctionIpe
-        GroupNotesOnLocationLabel -> groupBy eqByLocationLabel
+        GroupNotesOnId -> compareId
+        GroupNotesOnDictInfos -> compareDictInfos
+        GroupNotesOnFunctionIpe -> compareFunctionIpe
+        GroupNotesOnLocationLabel -> compareLocationLabel

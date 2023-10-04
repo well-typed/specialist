@@ -37,7 +37,7 @@ data DictInfo =
       { dictInfoProv :: Maybe InfoProv
       , dictInfoFreeDicts :: [DictInfo]
       }
-  deriving (Show, Read, Eq)
+  deriving (Show, Read, Eq, Ord)
 
 data Dict (c :: Constraint) where
     Dict :: forall c. c => Dict c

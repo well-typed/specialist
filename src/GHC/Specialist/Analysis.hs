@@ -9,34 +9,36 @@ module GHC.Specialist.Analysis
     module GHC.Specialist.Analysis.TextFile
 
     -- * Comparing 'SpecialistNote's
-  , eqById
-  , eqByDictInfos
-  , eqByFunctionIpe
-  , eqByLocationLabel
+  , compareId
+  , compareDictInfos
+  , compareFunctionIpe
+  , compareLocationLabel
   ) where
 
 import GHC.Specialist.Analysis.EventLog
 import GHC.Specialist.Analysis.TextFile
 import GHC.Specialist.Plugin.Types
 
-import Data.Maybe
-
 -------------------------------------------------------------------------------
 -- * Functions on 'SpecialistNote's
 -------------------------------------------------------------------------------
 
-eqById :: SpecialistNote -> SpecialistNote -> Bool
-eqById (SpecialistNote cid1 _ _ _ _) (SpecialistNote cid2 _ _ _ _) =
-    cid1 == cid2
+compareId :: SpecialistNote -> SpecialistNote -> Ordering
+compareId (SpecialistNote cid1 _ _ _ _) (SpecialistNote cid2 _ _ _ _) =
+    compare cid1 cid2
 
-eqByDictInfos :: SpecialistNote -> SpecialistNote -> Bool
-eqByDictInfos (SpecialistNote _ dis1 _ _ _) (SpecialistNote _ dis2 _ _ _) =
-    fromMaybe False ((==) <$> sequence dis1 <*> sequence dis2)
+compareDictInfos :: SpecialistNote -> SpecialistNote -> Ordering
+compareDictInfos (SpecialistNote _ dis1 _ _ _) (SpecialistNote _ dis2 _ _ _) =
+    case (sequence dis1, sequence dis2) of
+      (Nothing, Nothing) -> GT
+      (dis1', dis2') -> compare dis1' dis2'
 
-eqByFunctionIpe :: SpecialistNote -> SpecialistNote -> Bool
-eqByFunctionIpe (SpecialistNote _ _ fIpe1 _ _) (SpecialistNote _ _ fIpe2 _ _) =
-    fromMaybe False ((==) <$> fIpe1 <*> fIpe2)
+compareFunctionIpe :: SpecialistNote -> SpecialistNote -> Ordering
+compareFunctionIpe (SpecialistNote _ _ fIpe1 _ _) (SpecialistNote _ _ fIpe2 _ _) =
+    case (fIpe1, fIpe2) of
+      (Nothing, Nothing) -> GT
+      (fIpe1', fIpe2') -> compare fIpe1' fIpe2'
 
-eqByLocationLabel :: SpecialistNote -> SpecialistNote -> Bool
-eqByLocationLabel (SpecialistNote _ _ _ l1 _) (SpecialistNote _ _ _ l2 _) =
-    l1 == l2
+compareLocationLabel :: SpecialistNote -> SpecialistNote -> Ordering
+compareLocationLabel (SpecialistNote _ _ _ l1 _) (SpecialistNote _ _ _ l2 _) =
+    compare l1 l2

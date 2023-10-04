@@ -55,5 +55,6 @@ executable specialyze
     , Utils
   build-depends:
       specialist
+    , containers
     , ghc-events
     , optparse-applicative
