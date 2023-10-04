@@ -22,6 +22,7 @@ import GHC.Types.DumpSpecInfo
 data SpecialistNote =
     SpecialistNote
       { specialistNoteId :: String
+      , specialistNoteCcs :: [String]
       , specialistNoteDictInfos :: [Maybe DictInfo]
       , specialistNoteFunctionIpe :: Maybe InfoProv
       , specialistNoteLocationLabel :: String

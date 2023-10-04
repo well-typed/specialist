@@ -7,12 +7,14 @@ module GHC.Specialist.Plugin.Instrumentation where
 
 import GHC.Specialist.Plugin.Types
 
+import Control.Monad
 import Data.Maybe
 import Debug.Trace
 import GHC.Exts
 import GHC.Exts.Heap
 import GHC.InfoProv
 import GHC.IO (unsafePerformIO)
+import System.Random
 import Unsafe.Coerce
 
 -- | Put a dictionary in a box
@@ -46,13 +48,17 @@ specialistWrapper' :: forall a r (b :: TYPE r).
   -> [Box]
   -> ()
 specialistWrapper' fIdAddr lAddr ssAddr f boxedDicts =
-    unsafePerformIO $
-      traceEventIO . show =<<
-        SpecialistNote (unpackCString# fIdAddr)
-          <$> mapM (\(Box d) -> getDictInfo d) boxedDicts
-          <*> whereFrom f
-          <*> pure (unpackCString# lAddr)
-          <*> pure (unpackCString# ssAddr)
+    unsafePerformIO $ do
+      -- Only emit about 1/100th of the times this path is executed
+      coin <- randomRIO @Int (1, 100)
+      when (coin == 42) $
+        traceEventIO . show =<<
+          SpecialistNote (unpackCString# fIdAddr)
+            <$> currentCallStack
+            <*> mapM (\(Box d) -> getDictInfo d) boxedDicts
+            <*> whereFrom f
+            <*> pure (unpackCString# lAddr)
+            <*> pure (unpackCString# ssAddr)
 
 specialistWrapper :: forall a r (b :: TYPE r).
      Addr#

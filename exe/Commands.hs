@@ -115,7 +115,7 @@ groupNotesOptions =
     <$> groupNotesOn
     <*> optional
           ( strOption
-              (    long "separator"
+              (    long "sep"
                 <> short 's'
                 <> metavar "STRING"
                 <> help "Separate the groups of notes with a line containing the provided string in the output"
