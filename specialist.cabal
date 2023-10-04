@@ -28,14 +28,21 @@ library
   exposed-modules:
       GHC.Specialist
       GHC.Specialist.Analysis
+      GHC.Specialist.Analysis.EventLog
+      GHC.Specialist.Analysis.TextFile
       GHC.Specialist.Plugin
       GHC.Specialist.Plugin.Compat
+      GHC.Specialist.Plugin.Initialization
       GHC.Specialist.Plugin.Instrumentation
-      GHC.Specialist.Types
+      GHC.Specialist.Plugin.Logging
+      GHC.Specialist.Plugin.Orphans
+      GHC.Specialist.Plugin.Types
   build-depends:
       ghc
     , ghc-events
     , ghc-heap
+    , containers
+    , directory
     , mtl
     , text
 

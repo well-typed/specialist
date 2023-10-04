@@ -1,5 +1,7 @@
 module Main where
 
+import GHC.Specialist.Plugin.Types
+
 import Commands
 
 import Options.Applicative
@@ -8,7 +10,7 @@ main :: IO ()
 main = do
     execParser opts >>= uncurry interpretSpecialyzeCommand
   where
-    opts :: ParserInfo (FilePath, SpecialyzeCommand)
+    opts :: ParserInfo (IO (Either String [SpecialistNote]), SpecialyzeCommand)
     opts =
       info
         (specialyzeCommand <**> helper)

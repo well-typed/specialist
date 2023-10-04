@@ -3,8 +3,11 @@
 module GHC.Specialist.Plugin where
 
 import GHC.Specialist.Plugin.Compat
+import GHC.Specialist.Plugin.Initialization
 import GHC.Specialist.Plugin.Instrumentation
-import GHC.Specialist.Types
+import GHC.Specialist.Plugin.Logging
+import GHC.Specialist.Plugin.Orphans ()
+import GHC.Specialist.Plugin.Types
 
 import Control.Monad.State
 import Control.Monad.Reader
@@ -25,14 +28,14 @@ plugin =
     defaultPlugin
       { installCoreToDos = \opts todos -> do
           specialistEnv <- mkSpecialistEnv opts
-          specialistState <- initSpecialistState
+          specialistState <- initSpecialistState specialistEnv
           runSpecialist specialistEnv specialistState (install todos)
       }
 
 -- | Install Specialist at the end of the core-to-core passes.
 install :: [CoreToDo] -> SpecialistM [CoreToDo]
 install todos = do
-    slog "Inserting Specialist plugin at end of compilation pipeline"
+    slogV "Inserting Specialist plugin at end of compilation pipeline"
     todo <- specialist
 
     -- Insert Specialist at the end of the compilation todos
@@ -49,7 +52,7 @@ specialist = do
         let
           currentModuleString = moduleNameString (moduleName mg_module)
 
-        slogCore specialistEnv $
+        slogCoreV specialistEnv $
           "Starting Specialist plugin on module: " ++ currentModuleString
 
         -- Process all top-level binders in the core program
@@ -58,18 +61,6 @@ specialist = do
             mapM processBind mg_binds
 
         return $ mgs { mg_binds = mg_binds' }
-
--- | Parse the plugin options into a 'SpecialistEnv'
-mkSpecialistEnv :: [CommandLineOption] -> CoreM SpecialistEnv
-mkSpecialistEnv opts =
-    return $
-      SpecialistEnv
-        { specialistEnvVerbosity =
-            if "v" `elem` opts then
-              Verbose
-            else
-              Silent
-        }
 
 -------------------------------------------------------------------------------
 -- Plugin AST traversals
@@ -123,9 +114,9 @@ processExpr = \case
            -- Avoid instrumenting join points
         && not (isJoinVarExpr f)
       then do
-        slog "\n\nAn application expression appears to be overloaded"
-        slog "Application:"
-        slogS app
+        slogVV "\n\nAn application expression appears to be overloaded"
+        slogVV "Application:"
+        slogVV app
 
         -- We now know:
         --   1. At least one of the arguments is a dictionary
@@ -138,13 +129,8 @@ processExpr = \case
         --   f t1 ... tN a1 ... aM
         --
         -- Where t1 ... tN are type arguments, a1 ... aM are value arguments,
-        -- and one of a1 ... aM is a dictionary. NOTE: I think it should be
-        -- impossible for a dictionary argument to occur anywhere but as the
-        -- first argument to the function, since they are passed as constraints,
-        -- but we handle the general case here.
-        --
-        -- We want to transform this application into an expression like the
-        -- following:
+        -- and one or more of a1 ... aM are dictionaries. We want to transform
+        -- this application into an expression like the following:
         --
         --   case specialistWrapper ... of () -> f t1 ... tN a1 ... aM
         --
@@ -168,7 +154,7 @@ processExpr = \case
           (preDictArgs, dictArg, postDictArgs) =
             case break isDictExpr valArgs of
               (_, []) -> error "Specialist found an overloaded application with no dictionary arguments (impossible?)"
-              (pre, (dict:post)) -> (pre, dict, post)
+              (pre, dict:post) -> (pre, dict, post)
 
           -- All dictionaries used in the overloaded call
           dicts = dictArg : filter isDictExpr postDictArgs
@@ -183,12 +169,12 @@ processExpr = \case
           -- to the pre-dictionary args)
           (ta, tb) = (exprType dictArg, exprType (mkCoreApp empty f' dictArg))
 
-        slog "Application type args:"
-        slogS tyArgs
-        slog "Application value args:"
-        slogS valArgs
-        slog "Application result type:"
-        slogS resultTy
+        slogVV "Application type args:"
+        slogVV tyArgs
+        slogVV "Application value args:"
+        slogVV valArgs
+        slogVV "Application result type:"
+        slogVV resultTy
 
         -- Get the wrapper function
         wrapperId <- lift $ do
@@ -217,7 +203,7 @@ processExpr = \case
             \case
               Just (ss, l) -> do
                 dflags <- lift getDynFlags
-                return $ (showSDoc dflags (ppr ss), l)
+                return (showSDoc dflags (ppr ss), l)
               Nothing -> return ("", "")
 
         uniqId <- show <$> getUniqueM
@@ -229,21 +215,21 @@ processExpr = \case
         let
           wrapperApp =
             mkCoreApps
-              (Var wrapperId) $
-                  [ Type ta
-                  , Type $ getRuntimeRep tb
-                  , Type tb
-                  , fIdStr
-                  , lStr
-                  , ssStr
-                  , f'
-                  , mkListExpr boxType $
-                      map
-                        ( \d ->
-                            mkCoreApps (Var mkBoxId) [Type $ exprType d, d]
-                        )
-                        dicts
-                  ]
+              (Var wrapperId)
+              [ Type ta
+              , Type $ getRuntimeRep tb
+              , Type tb
+              , fIdStr
+              , lStr
+              , ssStr
+              , f'
+              , mkListExpr boxType $
+                  map
+                    ( \d ->
+                        mkCoreApps (Var mkBoxId) [Type $ exprType d, d]
+                    )
+                    dicts
+              ]
 
           wrappedApp =
             mkWildCase
@@ -253,8 +239,8 @@ processExpr = \case
               [ Alt (DataAlt unitDataCon) [] (mkCoreApps f args)
               ]
 
-        slog "Wrapped application:"
-        slogS wrappedApp
+        slogVV "Wrapped application:"
+        slogVV wrappedApp
 
         return wrappedApp
       else
@@ -315,21 +301,3 @@ isJoinVarExpr =
     \case
       Var var -> isJoinId var
       _ -> False
-
-slog :: String -> SpecialistM ()
-slog m =
-    asks specialistEnvVerbosity >>= \case
-      Silent -> return ()
-      Verbose -> lift $ putMsgS m
-
-slogS :: Outputable a => a -> SpecialistM ()
-slogS x =
-    asks specialistEnvVerbosity >>= \case
-      Silent -> return ()
-      Verbose -> lift . putMsg $ ppr x
-
-slogCore :: SpecialistEnv -> String -> CoreM ()
-slogCore SpecialistEnv{..} x =
-    case specialistEnvVerbosity of
-      Silent -> return ()
-      Verbose -> putMsgS x

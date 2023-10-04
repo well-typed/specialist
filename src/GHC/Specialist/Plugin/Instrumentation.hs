@@ -5,7 +5,7 @@
 
 module GHC.Specialist.Plugin.Instrumentation where
 
-import GHC.Specialist.Types
+import GHC.Specialist.Plugin.Types
 
 import Data.Maybe
 import Debug.Trace
@@ -28,14 +28,14 @@ mkBox = dictToBox (Dict @a)
 getDictInfo :: forall a. a -> IO (Maybe DictInfo)
 getDictInfo d = do
     getClosureData d >>=
-        \case
-          ConstrClosure _ ptrs _ _ _ dcon_nm
-            | 'C':':':_ <- dcon_nm -> do
-              wf <- whereFrom d
-              frees <- catMaybes <$> mapM (\(Box fd) -> getDictInfo fd) ptrs
-              return $ Just $ DictInfo wf frees
-          _ ->
-            return Nothing
+      \case
+        ConstrClosure _ ptrs _ _ _ dcon_nm
+          | 'C':':':_ <- dcon_nm -> do
+            wf <- whereFrom d
+            frees <- catMaybes <$> mapM (\(Box fd) -> getDictInfo fd) ptrs
+            return $ Just $ DictInfo wf frees
+        _ ->
+          return Nothing
 
 {-# NOINLINE specialistWrapper' #-}
 specialistWrapper' :: forall a r (b :: TYPE r).
@@ -48,9 +48,8 @@ specialistWrapper' :: forall a r (b :: TYPE r).
 specialistWrapper' fIdAddr lAddr ssAddr f boxedDicts =
     unsafePerformIO $
       traceEventIO . show =<<
-        SpecialistNote
-          <$> pure (unpackCString# fIdAddr)
-          <*> mapM (\(Box d) -> getDictInfo d) boxedDicts
+        SpecialistNote (unpackCString# fIdAddr)
+          <$> mapM (\(Box d) -> getDictInfo d) boxedDicts
           <*> whereFrom f
           <*> pure (unpackCString# lAddr)
           <*> pure (unpackCString# ssAddr)

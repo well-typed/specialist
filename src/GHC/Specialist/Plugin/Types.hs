@@ -2,13 +2,18 @@
 
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-module GHC.Specialist.Types where
+module GHC.Specialist.Plugin.Types where
+
+import GHC.Specialist.Plugin.Orphans ()
 
 import Control.Monad.Reader
 import Control.Monad.State.Strict
 import Data.Kind
+import Data.Map (Map)
+import Data.Text (Text)
 import GHC.InfoProv
 import GHC.Plugins
+import GHC.Types.DumpSpecInfo
 
 -------------------------------------------------------------------------------
 -- Instrumentation types
@@ -44,24 +49,17 @@ data Dict (c :: Constraint) where
 data SpecialistEnv =
     SpecialistEnv
       { specialistEnvVerbosity :: !Verbosity
+      , specialistEnvInputSpecsFile :: !FilePath
       }
 
 data SpecialistState =
     SpecialistState
       { specialistStateLastSourceNote :: !(Maybe (RealSrcSpan, String))
       , specialistStateUniqSupply :: UniqSupply
+      , specialistStateInputSpecs :: Map Text (DumpSpecInfo Text Text Text)
       }
 
-initSpecialistState :: CoreM SpecialistState
-initSpecialistState = do
-    uniqSupply <- liftIO $ mkSplitUniqSupply 'z'
-    return $
-      SpecialistState
-        { specialistStateLastSourceNote = Nothing
-        , specialistStateUniqSupply = uniqSupply
-        }
-
-data Verbosity = Silent | Verbose
+data Verbosity = Silent | Verbose | VeryVerbose
 
 newtype SpecialistT m a =
     SpecialistT

@@ -3,7 +3,7 @@ module Commands where
 import Utils
 
 import GHC.Specialist.Analysis
-import GHC.Specialist.Types
+import GHC.Specialist.Plugin.Types
 
 import Control.Monad
 import Data.List
@@ -18,22 +18,35 @@ data SpecialyzeCommand =
     ListNotesCommand
   | GroupNotesCommand GroupNotesOptions
 
-specialyzeCommand :: Parser (FilePath, SpecialyzeCommand)
+data InputFormat = EventLogFormat | TextFormat
+
+specialyzeCommand
+  :: Parser (IO (Either String [SpecialistNote]), SpecialyzeCommand)
 specialyzeCommand =
         (,)
-    <$> eventLogFilePath
+    <$> (eventLogFile <|> textFile)
     <*> subparser
           (    command "list-notes" listNotesInfo
             <> command "group-notes" groupNotesInfo
           )
   where
-    eventLogFilePath :: Parser FilePath
-    eventLogFilePath =
+    eventLogFile :: Parser (IO (Either String [SpecialistNote]))
+    eventLogFile = specialistNotesFromEventLogFile <$>
       strOption
         (    long "eventlog"
-          <> short 'f'
           <> metavar "EVENTLOG"
-          <> help "Specify the path to the eventlog"
+          <> help "Specify the location of an eventlog containing the specialist output"
+        )
+
+    textFile :: Parser (IO (Either String [SpecialistNote]))
+    textFile = specialistNotesFromFile <$>
+      strOption
+        (    long "text-file"
+          <> metavar "FILE"
+          <> help
+               ( "Specify the location of a text file containing the " ++
+                 "readable specialist notes, separated by newlines"
+               )
         )
 
     listNotesInfo :: ParserInfo SpecialyzeCommand
@@ -52,13 +65,16 @@ specialyzeCommand =
 -- Interpreting commands
 -------------------------------------------------------------------------------
 
-interpretSpecialyzeCommand :: FilePath -> SpecialyzeCommand -> IO ()
-interpretSpecialyzeCommand eventLogFile =
+interpretSpecialyzeCommand
+  :: IO (Either String [SpecialistNote])
+  -> SpecialyzeCommand
+  -> IO ()
+interpretSpecialyzeCommand getNotes =
     \case
       ListNotesCommand ->
-        interpretListNotesCommand eventLogFile
+        interpretListNotesCommand getNotes
       GroupNotesCommand GroupNotesOptions{..} ->
-        interpretGroupNotesCommand eventLogFile
+        interpretGroupNotesCommand getNotes
           groupNotesOptionsGroupNotesOn
           groupNotesOptionsSep
 
@@ -66,12 +82,14 @@ interpretSpecialyzeCommand eventLogFile =
 -- list-notes command
 -------------------------------------------------------------------------------
 
-interpretListNotesCommand :: FilePath -> IO ()
-interpretListNotesCommand eventLogFile =
-    specialistNotesFromEventLogFile eventLogFile >>=
+interpretListNotesCommand :: IO (Either String [SpecialistNote]) -> IO ()
+interpretListNotesCommand getNotes =
+    getNotes >>=
       \case
-        Right notes -> mapM_ print notes
-        Left _ -> perish "failed to get specialist notes from the eventlog"
+        Right notes ->
+          mapM_ print notes
+        Left msg ->
+          perish $ "failed to get specialist notes from the input: " <> msg
 
 -------------------------------------------------------------------------------
 -- group-notes command
@@ -108,7 +126,7 @@ groupNotesOptions =
 groupNotesOn :: Parser GroupNotesOn
 groupNotesOn =
     option (maybeReader parseGroupNotesOn)
-      (    long "group-on"
+      (    long "on"
         <> help
              ( "Specify the trait to group the specialist notes on " ++
                "(\"id\", \"dict-info\", \"function-ipe\", or \"location-label\")"
@@ -122,12 +140,14 @@ parseGroupNotesOn "function-ipe"   = Just GroupNotesOnFunctionIpe
 parseGroupNotesOn "location-label" = Just GroupNotesOnLocationLabel
 parseGroupNotesOn x                = readMaybe x
 
-interpretGroupNotesCommand :: FilePath -> GroupNotesOn -> Maybe String -> IO ()
-interpretGroupNotesCommand eventLogFile groupOn msep =
-    specialistNotesFromEventLogFile eventLogFile >>=
+interpretGroupNotesCommand :: IO (Either String [SpecialistNote]) -> GroupNotesOn -> Maybe String -> IO ()
+interpretGroupNotesCommand getNotes groupOn msep =
+    getNotes >>=
       \case
-        Right notes -> foldM_ go () $ grouper notes
-        Left _ -> perish "failed to get specialist notes from the eventlog"
+        Right notes ->
+          foldM_ go () $ grouper notes
+        Left msg ->
+          perish $ "failed to get specialist notes from the input: " ++ msg
   where
     go :: () -> [SpecialistNote] -> IO ()
     go () notes = do
