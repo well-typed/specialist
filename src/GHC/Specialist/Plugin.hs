@@ -30,6 +30,7 @@ plugin =
           specialistEnv <- mkSpecialistEnv opts
           specialistState <- initSpecialistState specialistEnv
           runSpecialist specialistEnv specialistState (install todos)
+      , pluginRecompile = purePlugin
       }
 
 -- | Install Specialist at the end of the core-to-core passes.
