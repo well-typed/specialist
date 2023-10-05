@@ -250,5 +250,8 @@ interpretDictProvenanceCommand getNotes =
       putStrLn "  dictionary:"
       putStrLn $ "    " ++ show d
       putStrLn "  provenances:"
-      mapM_ (putStrLn . ("    " ++) . show) $ Set.elems paths
+      mapM_
+          (putStrLn . ("    " ++) . show)
+        . sortBy (\p1 p2 -> compare (length p1) (length p2))
+        $ Set.elems paths
       putStrLn ""
