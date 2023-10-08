@@ -251,7 +251,13 @@ interpretDictProvenanceCommand getNotes =
       putStrLn $ "    " ++ show d
       putStrLn "  provenances:"
       mapM_
-          (putStrLn . ("    " ++) . show)
+          prettyPrintCallStack
         . sortBy (\p1 p2 -> compare (length p1) (length p2))
         $ Set.elems paths
       putStrLn ""
+
+    prettyPrintCallStack :: [String] -> IO ()
+    prettyPrintCallStack ccs =
+      putStrLn $ unlines $
+          "    CC stack:"
+        : map ("      " ++) ccs

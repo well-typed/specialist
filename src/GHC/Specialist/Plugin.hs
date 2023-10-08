@@ -208,18 +208,19 @@ processExpr = \case
               Nothing -> return ("", "")
 
         uniqId <- show <$> getUniqueM
+        sampleProb <- asks specialistEnvSampleProb
         let
           fIdStr = mkStringLit uniqId
           lStr = mkStringLit l
           ssStr = mkStringLit ss
-
-        let
+          sampleProbExpr = mkDoubleExpr sampleProb
           wrapperApp =
             mkCoreApps
               (Var wrapperId)
               [ Type ta
               , Type $ getRuntimeRep tb
               , Type tb
+              , sampleProbExpr
               , fIdStr
               , lStr
               , ssStr

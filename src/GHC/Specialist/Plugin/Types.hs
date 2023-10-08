@@ -51,6 +51,7 @@ data SpecialistEnv =
     SpecialistEnv
       { specialistEnvVerbosity :: !Verbosity
       , specialistEnvInputSpecsFile :: !FilePath
+      , specialistEnvSampleProb :: !Double
       }
 
 data SpecialistState =

@@ -41,16 +41,17 @@ getDictInfo d = do
 
 {-# NOINLINE specialistWrapper' #-}
 specialistWrapper' :: forall a r (b :: TYPE r).
-     Addr#
+     Double
+  -> Addr#
   -> Addr#
   -> Addr#
   -> (a -> b)
   -> [Box]
   -> ()
-specialistWrapper' fIdAddr lAddr ssAddr f boxedDicts =
+specialistWrapper' sampleProb fIdAddr lAddr ssAddr f boxedDicts =
     unsafePerformIO $ do
       -- Only emit about 1/100th of the times this path is executed
-      coin <- (<0.01) <$> randomRIO @Double (0.0, 1.0)
+      coin <- (< sampleProb) <$> randomRIO @Double (0.0, 1.0)
       when coin $
         traceEventIO . show =<<
           SpecialistNote (unpackCString# fIdAddr)
@@ -61,7 +62,9 @@ specialistWrapper' fIdAddr lAddr ssAddr f boxedDicts =
             <*> pure (unpackCString# ssAddr)
 
 specialistWrapper :: forall a r (b :: TYPE r).
-     Addr#
+     Double
+  -- ^ Sample probability
+  -> Addr#
   -> Addr#
   -> Addr#
   -> (a => b)

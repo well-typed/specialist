@@ -20,6 +20,7 @@ defaultSpecialistEnv log_flags =
     SpecialistEnv
       { specialistEnvVerbosity = Silent
       , specialistEnvInputSpecsFile = logFlagsToDumpSpecsFile log_flags
+      , specialistEnvSampleProb = 0.01
       }
 
 -- | Parse the plugin options into a 'SpecialistEnv'
@@ -32,14 +33,23 @@ mkSpecialistEnv opts = do
     parseOpts :: SpecialistEnv -> CommandLineOption -> SpecialistEnv
     parseOpts env = \case
       -- An occurrence of "v" means the user has requested verbose output
-      "v" -> env { specialistEnvVerbosity = Verbose }
+      "v" ->
+        env { specialistEnvVerbosity = Verbose }
 
       -- An occurrence of "vv" means the user has requested very verbose output
-      "vv" -> env { specialistEnvVerbosity = VeryVerbose }
+      "vv" ->
+        env { specialistEnvVerbosity = VeryVerbose }
+
+      -- An occurrence of "f:X" where X parses as a Double means the user has
+      -- requests a sample probability of X (e.g. 0.01 means 1% sample
+      -- probability)
+      'f':':':freqStr | Just freq <- readMaybe freqStr ->
+        env { specialistEnvSampleProb = freq }
 
       -- Any other argument means the user is overriding the location of dump
       -- output to read for this module
-      file -> env { specialistEnvInputSpecsFile = file }
+      file ->
+        env { specialistEnvInputSpecsFile = file }
 
 logFlagsToDumpSpecsFile :: LogFlags -> FilePath
 logFlagsToDumpSpecsFile log_flags =
