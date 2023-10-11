@@ -1,6 +1,7 @@
 dist-newstyle
+cabal.project.local
 .envrc
 **/*.eventlog
-**/specialist-notes.txt
+**/*.txt
 test/*
 !test/**.hs
