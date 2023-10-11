@@ -28,7 +28,7 @@ data SpecialistNote =
       , specialistNoteLocationLabel :: String
       , specialistNoteLocationSpan :: String
       }
-  deriving (Show, Read, Eq)
+  deriving (Show, Read, Eq, Ord)
 
 -- This should probably just be derived in GHC
 deriving instance Read InfoProv

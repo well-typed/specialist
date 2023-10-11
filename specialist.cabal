@@ -28,6 +28,7 @@ library
   exposed-modules:
       GHC.Specialist
       GHC.Specialist.Analysis
+      GHC.Specialist.Analysis.DumpSpecialisations
       GHC.Specialist.Analysis.EventLog
       GHC.Specialist.Analysis.TextFile
       GHC.Specialist.Plugin
@@ -53,9 +54,17 @@ executable specialyze
   main-is: Main.hs
   other-modules:
       Commands
+    , Commands.Common
+    , Commands.DictProvenance
+    , Commands.FindDuplicateSpecs
+    , Commands.GroupNotes
+    , Commands.ListNotes
     , Utils
   build-depends:
       specialist
     , containers
+    , dir-traverse
+    , ghc
     , ghc-events
     , optparse-applicative
+    , text

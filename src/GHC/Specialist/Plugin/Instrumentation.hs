@@ -65,8 +65,11 @@ specialistWrapper :: forall a r (b :: TYPE r).
      Double
   -- ^ Sample probability
   -> Addr#
+  -- ^ Unique identifier for this overloaded call site
   -> Addr#
+  -- ^ Label of the last source tick we encountered
   -> Addr#
+  -- ^ Source span of the last source tick we encountered
   -> (a => b)
   -- ^ The overloaded function
   -> [Box]

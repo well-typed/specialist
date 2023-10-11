@@ -1,5 +1,6 @@
 module GHC.Specialist.Plugin.Initialization where
 
+import GHC.Specialist.Analysis.DumpSpecialisations
 import GHC.Specialist.Plugin.Logging
 import GHC.Specialist.Plugin.Types
 
@@ -63,7 +64,7 @@ initSpecialistState :: SpecialistEnv -> CoreM SpecialistState
 initSpecialistState env = do
     let input_specs_file = specialistEnvInputSpecsFile env
     slogCoreV env $ "Reading specialisations from file: " ++ input_specs_file
-    input_specs <- liftIO $ readDumpSpecInfosFromDumpFile input_specs_file
+    input_specs <- liftIO $ readDumpSpecInfosToMap input_specs_file
     slogCoreVV env "Read input specialisations:"
     slogCoreVV env $ show input_specs
     uniqSupply <- liftIO $ mkSplitUniqSupply 'z'
@@ -77,23 +78,19 @@ initSpecialistState env = do
 -- | Reads the 'DumpSpecInfo's from the dump file at the given file path and
 -- creates a map indexed by the name of the function that has a specialisation
 -- generated.
-readDumpSpecInfosFromDumpFile
+readDumpSpecInfosToMap
   :: MonadIO m
   => FilePath
   -> m (Map Text (DumpSpecInfo Text Text Text))
-readDumpSpecInfosFromDumpFile dump_file = liftIO $ do
+readDumpSpecInfosToMap dump_file = liftIO $ do
     dumpFileExists <- doesFileExist dump_file
     if dumpFileExists then do
-      foldr go Map.empty . lines <$> readFile dump_file
+      foldr go Map.empty <$> readDumpSpecInfosFromFile dump_file
     else
       pure Map.empty
   where
     go
-      :: String
+      :: DumpSpecInfo Text Text Text
       -> Map Text (DumpSpecInfo Text Text Text)
       -> Map Text (DumpSpecInfo Text Text Text)
-    go dump_line acc =
-      case readMaybe dump_line of
-        Just info@DumpSpecInfo{..} ->
-          Map.insert dumpSpecInfo_polyId info acc
-        Nothing -> acc
+    go info@DumpSpecInfo{..} = Map.insert dumpSpecInfo_polyId info
