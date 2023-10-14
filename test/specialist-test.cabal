@@ -1,0 +1,40 @@
+cabal-version: 3.6
+name: specialist-test
+version: 0.1.0
+
+common common-all
+  default-language: GHC2021
+  build-depends:
+      base
+    , specialist
+  ghc-options:
+    -fplugin=GHC.Specialist
+    -fplugin-opt=GHC.Specialist:vv
+    -fplugin-opt=GHC.Specialist:f:1.0
+
+library
+  import: common-all
+  hs-source-dirs: unit-tests
+  exposed-modules:
+      T3
+    , T6
+
+executable T1
+  import: common-all
+  main-is:
+    unit-tests/T1.hs
+
+executable T2
+  import: common-all
+  main-is:
+    unit-tests/T2.hs
+
+executable T4
+  import: common-all
+  main-is:
+    unit-tests/T4.hs
+
+executable T5
+  import: common-all
+  main-is:
+    unit-tests/T5.hs

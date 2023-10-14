@@ -1,0 +1,23 @@
+packages:
+    .
+  , ../specialist.cabal
+  , ./cabal/*/*.cabal
+
+allow-newer:
+  *:*
+
+profiling: True
+profiling-detail: late
+
+program-options
+  ghc-options:
+    -finfo-table-map
+    -fdistinct-constructor-tables
+    -ddump-specialisations
+    -ddump-simpl
+    -ddump-to-file
+    -package-db=/Users/finley/.cabal/store/ghc-9.6.3.20231003/package.db
+    -plugin-package=specialist
+    -package=specialist
+    -fplugin=GHC.Specialist
+    -fplugin-opt=GHC.Specialist:f:1.0

@@ -58,7 +58,8 @@ data SpecialistState =
     SpecialistState
       { specialistStateLastSourceNote :: !(Maybe (RealSrcSpan, String))
       , specialistStateUniqSupply :: UniqSupply
-      , specialistStateInputSpecs :: Map Text (DumpSpecInfo Text Text Text)
+      , specialistStateInputSpecs :: !(Map Text (DumpSpecInfo Text Text Text))
+      , specialistStateOverloadedCallCount :: !Integer
       }
 
 data Verbosity = Silent | Verbose | VeryVerbose
@@ -95,10 +96,18 @@ instance Monad m => MonadUnique (SpecialistT m) where
 
 type SpecialistM = SpecialistT CoreM
 
-runSpecialist
+evalSpecialist
   :: Monad m
   => SpecialistEnv
   -> SpecialistState
   -> SpecialistT m a
   -> m a
-runSpecialist env s (SpecialistT run) = evalStateT (runReaderT run env) s
+evalSpecialist env s (SpecialistT run) = evalStateT (runReaderT run env) s
+
+runSpecialist
+  :: Monad m
+  => SpecialistEnv
+  -> SpecialistState
+  -> SpecialistT m a
+  -> m (a, SpecialistState)
+runSpecialist env s (SpecialistT run) = runStateT (runReaderT run env) s

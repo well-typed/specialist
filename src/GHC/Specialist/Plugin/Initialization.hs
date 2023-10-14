@@ -73,6 +73,7 @@ initSpecialistState env = do
         { specialistStateLastSourceNote = Nothing
         , specialistStateUniqSupply = uniqSupply
         , specialistStateInputSpecs = input_specs
+        , specialistStateOverloadedCallCount = 0
         }
 
 -- | Reads the 'DumpSpecInfo's from the dump file at the given file path and

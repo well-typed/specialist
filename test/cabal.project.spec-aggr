@@ -1,0 +1,6 @@
+import: cabal.project
+
+package *
+  ghc-options:
+    -fexpose-all-unfoldings
+    -fspecialise-aggressively

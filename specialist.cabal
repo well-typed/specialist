@@ -21,6 +21,11 @@ common common
     LambdaCase
   build-depends:
       base >=4.18.0.0 && < 5
+  ghc-options:
+    -fexpose-all-unfoldings
+    -fspecialise-aggressively
+    -finfo-table-map
+    -fdistinct-constructor-tables
 
 library
   import: common

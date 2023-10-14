@@ -1,0 +1,7 @@
+packages: .
+
+import: cabal.project
+
+package *
+  profiling: True
+  profiling-detail: late

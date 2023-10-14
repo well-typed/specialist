@@ -9,7 +9,7 @@ import GHC.Specialist.Plugin.Logging
 import GHC.Specialist.Plugin.Orphans ()
 import GHC.Specialist.Plugin.Types
 
-import Control.Monad.State
+import Control.Monad.State.Strict
 import Control.Monad.Reader
 import GHC.Core
 import GHC.Core.Predicate
@@ -29,7 +29,7 @@ plugin =
       { installCoreToDos = \opts todos -> do
           specialistEnv <- mkSpecialistEnv opts
           specialistState <- initSpecialistState specialistEnv
-          runSpecialist specialistEnv specialistState (install todos)
+          evalSpecialist specialistEnv specialistState (install todos)
       , pluginRecompile = purePlugin
       }
 
@@ -54,12 +54,17 @@ specialist = do
           currentModuleString = moduleNameString (moduleName mg_module)
 
         slogCoreV specialistEnv $
-          "Starting Specialist plugin on module: " ++ currentModuleString
+          "starting specialist plugin on module: " ++ currentModuleString
 
         -- Process all top-level binders in the core program
-        mg_binds' <-
+        (mg_binds', SpecialistState{..}) <-
           runSpecialist specialistEnv specialistState $
             mapM processBind mg_binds
+
+        slogCoreV specialistEnv $
+          "specialist plugin found " ++
+          show specialistStateOverloadedCallCount ++ " overloaded calls in " ++
+          "module " ++ currentModuleString
 
         return $ mgs { mg_binds = mg_binds' }
 
@@ -118,6 +123,14 @@ processExpr = \case
         slogVV "\n\nAn application expression appears to be overloaded"
         slogVV "Application:"
         slogVV app
+
+        -- Increment the count of overloaded calls in this module
+        modify' $
+          \s@SpecialistState{..} ->
+            s
+              { specialistStateOverloadedCallCount =
+                  1 + specialistStateOverloadedCallCount
+              }
 
         -- We now know:
         --   1. At least one of the arguments is a dictionary

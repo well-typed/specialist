@@ -2,3 +2,10 @@ packages: .
 
 allow-newer:
   ghc-events:base
+
+packages *
+  ghc-options:
+    -fexpose-all-unfoldings
+    -fspecialise-aggressively
+    -finfo-table-map
+    -fdistinct-constructor-tables

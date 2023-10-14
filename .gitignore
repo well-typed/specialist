@@ -3,5 +3,4 @@ cabal.project.local
 .envrc
 **/*.eventlog
 **/*.txt
-test/*
-!test/**.hs
+.package.db
