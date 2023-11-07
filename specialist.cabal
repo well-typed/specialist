@@ -64,12 +64,17 @@ executable specialyze
     , Commands.FindDuplicateSpecs
     , Commands.GroupNotes
     , Commands.ListNotes
+    , Commands.Pragmas
+    , Commands.ToSpeedscope
     , Utils
   build-depends:
       specialist
+    , aeson
     , containers
     , dir-traverse
+    , filepath
     , ghc
     , ghc-events
+    , hs-speedscope
     , optparse-applicative
     , text

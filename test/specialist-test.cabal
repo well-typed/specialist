@@ -11,6 +11,7 @@ common common-all
     -fplugin=GHC.Specialist
     -fplugin-opt=GHC.Specialist:vv
     -fplugin-opt=GHC.Specialist:f:1.0
+    -dcore-lint
 
 library
   import: common-all

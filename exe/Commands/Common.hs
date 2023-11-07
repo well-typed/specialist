@@ -10,12 +10,7 @@ notesInput =
     eventLogFile <|> textFile
   where
     eventLogFile :: Parser (IO (Either String [SpecialistNote]))
-    eventLogFile = specialistNotesFromEventLogFile <$>
-      strOption
-        (    long "eventlog"
-          <> metavar "EVENTLOG"
-          <> help "Specify the location of an eventlog containing the specialist output"
-        )
+    eventLogFile = specialistNotesFromEventLogFile <$> eventLogFileInput
 
     textFile :: Parser (IO (Either String [SpecialistNote]))
     textFile = specialistNotesFromFile <$>
@@ -27,3 +22,11 @@ notesInput =
                  "readable specialist notes, separated by newlines"
                )
         )
+
+eventLogFileInput :: Parser FilePath
+eventLogFileInput =
+    strOption
+      (    long "eventlog"
+        <> metavar "EVENTLOG"
+        <> help "Specify the location of an eventlog containing the specialist output"
+      )

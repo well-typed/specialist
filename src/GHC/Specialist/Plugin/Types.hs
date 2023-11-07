@@ -11,6 +11,7 @@ import Control.Monad.State.Strict
 import Data.Kind
 import Data.Map (Map)
 import Data.Text (Text)
+import Data.Word
 import GHC.InfoProv
 import GHC.Plugins
 import GHC.Types.DumpSpecInfo
@@ -23,10 +24,12 @@ data SpecialistNote =
     SpecialistNote
       { specialistNoteId :: String
       , specialistNoteCcs :: [String]
+      , specialistNoteCcIds :: [Word32]
       , specialistNoteDictInfos :: [Maybe DictInfo]
       , specialistNoteFunctionIpe :: Maybe InfoProv
       , specialistNoteLocationLabel :: String
       , specialistNoteLocationSpan :: String
+      , specialistNoteThreadId :: Word32
       }
   deriving (Show, Read, Eq, Ord)
 

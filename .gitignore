@@ -1,6 +1,8 @@
 dist-newstyle
 cabal.project.local
 .envrc
+**/*.prof
 **/*.eventlog
+**/*.json
 **/*.txt
 .package.db

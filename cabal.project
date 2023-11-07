@@ -3,7 +3,7 @@ packages: .
 allow-newer:
   ghc-events:base
 
-packages *
+package *
   ghc-options:
     -fexpose-all-unfoldings
     -fspecialise-aggressively

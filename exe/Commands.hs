@@ -4,6 +4,8 @@ import Commands.DictProvenance
 import Commands.FindDuplicateSpecs
 import Commands.GroupNotes
 import Commands.ListNotes
+import Commands.Pragmas
+import Commands.ToSpeedscope
 
 import Options.Applicative
 
@@ -16,6 +18,8 @@ data SpecialyzeCommand =
   | GroupNotesCommand GroupNotesOptions
   | DictProvenanceCommand DictProvenanceOptions
   | FindDuplicateSpecsCommand FindDuplicateSpecsOptions
+  | PragmasCommand PragmasOptions
+  | ToSpeedscopeCommand ToSpeedscopeOptions
 
 data InputFormat = EventLogFormat | TextFormat
 
@@ -28,6 +32,12 @@ specialyzeCommand =
         <> command
              "find-duplicate-specialisations"
              findDuplicateSpecialisationsInfo
+        <> command
+             "pragmas"
+             pragmasInfo
+        <> command
+             "to-speedscope"
+             toSpeedscopeInfo
       )
   where
     listNotesInfo :: ParserInfo SpecialyzeCommand
@@ -60,6 +70,24 @@ specialyzeCommand =
             "same type originating from different modules"
         )
 
+    toSpeedscopeInfo :: ParserInfo SpecialyzeCommand
+    toSpeedscopeInfo =
+      info
+        (ToSpeedscopeCommand <$> toSpeedscopeOptions)
+        ( progDesc $
+            "Make a speedscope formatted JSON file whose samples are " ++
+            "constructed using the overloaded calls in the specialist output"
+        )
+
+    pragmasInfo :: ParserInfo SpecialyzeCommand
+    pragmasInfo =
+      info
+        (PragmasCommand <$> pragmasOptions)
+        ( progDesc $
+            "Get a summary of the most executed overloaded calls that could " ++
+            "potentially be specialised using pragmas"
+        )
+
 -------------------------------------------------------------------------------
 -- Interpreting commands
 -------------------------------------------------------------------------------
@@ -75,3 +103,7 @@ interpretSpecialyzeCommand =
         interpretDictProvenanceCommand opts
       FindDuplicateSpecsCommand opts ->
         interpretFindDuplicateSpecsCommand opts
+      PragmasCommand opts ->
+        interpretPragmasCommand opts
+      ToSpeedscopeCommand opts ->
+        interpretToSpeedscopeCommand opts

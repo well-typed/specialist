@@ -7,13 +7,14 @@ module GHC.Specialist.Plugin.Instrumentation where
 
 import GHC.Specialist.Plugin.Types
 
+import Control.Concurrent
 import Control.Monad
 import Data.Maybe
 import Debug.Trace
 import GHC.Exts
 import GHC.Exts.Heap
 import GHC.InfoProv
-import GHC.IO (unsafePerformIO)
+import GHC.IO
 import System.Random
 import Unsafe.Coerce
 
@@ -50,16 +51,17 @@ specialistWrapper' :: forall a r (b :: TYPE r).
   -> ()
 specialistWrapper' sampleProb fIdAddr lAddr ssAddr f boxedDicts =
     unsafePerformIO $ do
-      -- Only emit about 1/100th of the times this path is executed
       coin <- (< sampleProb) <$> randomRIO @Double (0.0, 1.0)
       when coin $
         traceEventIO . show =<<
           SpecialistNote (unpackCString# fIdAddr)
             <$> currentCallStack
+            <*> (reverse <$> currentCallStackIds)
             <*> mapM (\(Box d) -> getDictInfo d) boxedDicts
             <*> whereFrom f
             <*> pure (unpackCString# lAddr)
             <*> pure (unpackCString# ssAddr)
+            <*> (fmap (fromIntegral . fst) $ myThreadId >>= threadCapability)
 
 specialistWrapper :: forall a r (b :: TYPE r).
      Double
