@@ -9,3 +9,8 @@ package *
     -fspecialise-aggressively
     -finfo-table-map
     -fdistinct-constructor-tables
+
+source-repository-package
+  type: git
+  location: https://github.com/FinleyMcIlwaine/hs-speedscope
+  tag: c8e08a9d480a484693361d86d87ffc19bbf46336
