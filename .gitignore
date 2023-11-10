@@ -4,5 +4,5 @@ cabal.project.local
 **/*.prof
 **/*.eventlog
 **/*.json
+**/*.html
 **/*.txt
-.package.db

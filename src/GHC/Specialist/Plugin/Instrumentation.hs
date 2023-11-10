@@ -36,9 +36,10 @@ getDictInfo d = do
           | 'C':':':_ <- dcon_nm -> do
             wf <- whereFrom d
             frees <- catMaybes <$> mapM (\(Box fd) -> getDictInfo fd) ptrs
-            return $ Just $ DictInfo wf frees
-        _ ->
-          return Nothing
+            return . Just $ DictInfo wf frees
+        _ -> do
+          wf <- whereFrom d
+          return . Just $ DictInfo wf []
 
 {-# NOINLINE specialistWrapper' #-}
 specialistWrapper' :: forall a r (b :: TYPE r).
