@@ -22,3 +22,7 @@ program-options
     -ddump-to-file
     -fplugin-opt=GHC.Specialist:f:1.0
     -fplugin-opt=GHC.Specialist:v
+
+package cabal-install
+  ghc-options:
+    -ddump-timings

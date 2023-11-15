@@ -65,6 +65,7 @@ executable specialyze
     , Commands.GroupNotes
     , Commands.ListNotes
     , Commands.Pragmas
+    , Commands.ToDot
     , Commands.ToSpeedscope
     , Utils
   build-depends:
@@ -72,9 +73,12 @@ executable specialyze
     , aeson
     , containers
     , dir-traverse
+    , fgl
     , filepath
     , ghc
     , ghc-events
+    , graphviz
     , hs-speedscope
+    , mtl
     , optparse-applicative
     , text

@@ -11,6 +11,7 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe
 import Data.Text (Text)
 import GHC.Plugins
+import GHC.Types.CostCentre.State
 import GHC.Types.DumpSpecInfo
 import GHC.Utils.Logger
 import System.Directory
@@ -71,6 +72,8 @@ initSpecialistState env = do
     return $
       SpecialistState
         { specialistStateLastSourceNote = Nothing
+        , specialistStateCurrentModule = Nothing
+        , specialistStateCostCentreState = newCostCentreState
         , specialistStateUniqSupply = uniqSupply
         , specialistStateInputSpecs = input_specs
         , specialistStateOverloadedCallCount = 0

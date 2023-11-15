@@ -5,6 +5,7 @@ import Commands.FindDuplicateSpecs
 import Commands.GroupNotes
 import Commands.ListNotes
 import Commands.Pragmas
+import Commands.ToDot
 import Commands.ToSpeedscope
 
 import Options.Applicative
@@ -19,6 +20,7 @@ data SpecialyzeCommand =
   | DictProvenanceCommand DictProvenanceOptions
   | FindDuplicateSpecsCommand FindDuplicateSpecsOptions
   | PragmasCommand PragmasOptions
+  | ToDotCommand ToDotOptions
   | ToSpeedscopeCommand ToSpeedscopeOptions
 
 data InputFormat = EventLogFormat | TextFormat
@@ -35,6 +37,9 @@ specialyzeCommand =
         <> command
              "pragmas"
              pragmasInfo
+        <> command
+             "to-dot"
+             toDotInfo
         <> command
              "to-speedscope"
              toSpeedscopeInfo
@@ -70,15 +75,6 @@ specialyzeCommand =
             "same type originating from different modules"
         )
 
-    toSpeedscopeInfo :: ParserInfo SpecialyzeCommand
-    toSpeedscopeInfo =
-      info
-        (ToSpeedscopeCommand <$> toSpeedscopeOptions)
-        ( progDesc $
-            "Make a speedscope formatted JSON file whose samples are " ++
-            "constructed using the overloaded calls in the specialist output"
-        )
-
     pragmasInfo :: ParserInfo SpecialyzeCommand
     pragmasInfo =
       info
@@ -86,6 +82,23 @@ specialyzeCommand =
         ( progDesc $
             "Get a summary of the most executed overloaded calls that could " ++
             "potentially be specialised using pragmas"
+        )
+
+    toDotInfo :: ParserInfo SpecialyzeCommand
+    toDotInfo =
+      info
+        (ToDotCommand <$> toDotOptions)
+        ( progDesc $
+            "Make GraphViz DOT formatted file that visualises the call graph"
+        )
+
+    toSpeedscopeInfo :: ParserInfo SpecialyzeCommand
+    toSpeedscopeInfo =
+      info
+        (ToSpeedscopeCommand <$> toSpeedscopeOptions)
+        ( progDesc $
+            "Make a speedscope formatted JSON file whose samples are " ++
+            "constructed using the overloaded calls in the specialist output"
         )
 
 -------------------------------------------------------------------------------
@@ -105,5 +118,7 @@ interpretSpecialyzeCommand =
         interpretFindDuplicateSpecsCommand opts
       PragmasCommand opts ->
         interpretPragmasCommand opts
+      ToDotCommand opts ->
+        interpretToDotCommand opts
       ToSpeedscopeCommand opts ->
         interpretToSpeedscopeCommand opts

@@ -11,10 +11,12 @@ import GHC.Specialist.Plugin.Types
 
 import Control.Monad.State.Strict
 import Control.Monad.Reader
+import Data.Maybe
 import GHC.Core
 import GHC.Core.Predicate
 import GHC.Core.TyCo.Rep (Scaled (..))
 import GHC.Plugins
+import GHC.Types.CostCentre
 import GHC.Types.Tickish
 import GHC.Types.TyThing
 
@@ -58,8 +60,12 @@ specialist = do
 
         -- Process all top-level binders in the core program
         (mg_binds', SpecialistState{..}) <-
-          runSpecialist specialistEnv specialistState $
-            mapM processBind mg_binds
+          runSpecialist
+            specialistEnv
+            specialistState
+              { specialistStateCurrentModule = Just mg_module
+              }
+            $ mapM processBind mg_binds
 
         slogCoreV specialistEnv $
           "specialist plugin found " ++
@@ -183,6 +189,8 @@ processExpr = \case
           -- to the pre-dictionary args)
           (ta, tb) = (exprType dictArg, exprType (mkCoreApp empty f' dictArg))
 
+        slogVV "Application function:"
+        slogVV f
         slogVV "Application type args:"
         slogVV tyArgs
         slogVV "Application value args:"
@@ -246,13 +254,57 @@ processExpr = \case
                     dicts
               ]
 
+
+        -----------------------------------------------------------------------
+        -- Cost centre insertion
+        -----------------------------------------------------------------------
+
+        -- What is the current module?
+        curMod <-
+          gets specialistStateCurrentModule >>= \case
+            Just m ->
+              return m
+            Nothing ->
+              error "Specialist plugin could not determine current module"
+
+        -- Extract a name and source location from the function being applied
+        let
+          !f_name_maybe = exprName app
+          f_srcspan_maybe = nameSrcSpan <$> f_name_maybe
+          cc_id_fs =
+            fsLit $
+              "<OVERLOADED call to function: " ++
+              maybe "(no name available)" getOccString f_name_maybe ++
+              "> call id " ++ uniqId
+
+        -- Cost centre index
+        -- Note: This should always be zero, since we include the unique call
+        -- site ID in the name
+        cc_index <- mkCcIndex cc_id_fs
+
+        let
+          overloadedCc =
+            ProfNote
+              ( mkUserCC
+                  cc_id_fs
+                  curMod
+                  ( fromMaybe
+                      (UnhelpfulSpan UnhelpfulNoLocationInfo)
+                      f_srcspan_maybe
+                  )
+                  (mkExprCCFlavour cc_index)
+              )
+              True
+              True
+
           wrappedApp =
-            mkWildCase
-              wrapperApp
-              (Scaled OneTy (exprType wrapperApp))
-              resultTy
-              [ Alt (DataAlt unitDataCon) [] (mkCoreApps f args)
-              ]
+            mkTick overloadedCc $
+              mkWildCase
+                wrapperApp
+                (Scaled OneTy (exprType wrapperApp))
+                resultTy
+                [ Alt (DataAlt unitDataCon) [] $ mkCoreApps f args
+                ]
 
         slogVV "Wrapped application:"
         slogVV wrappedApp
@@ -316,3 +368,15 @@ isJoinVarExpr =
     \case
       Var var -> isJoinId var
       _ -> False
+
+exprName :: CoreExpr -> Maybe Name
+exprName =
+    \case
+      App f _ ->
+        exprName f
+      Var f ->
+        Just (idName f)
+      Tick _ e ->
+        exprName e
+      _ ->
+        Nothing

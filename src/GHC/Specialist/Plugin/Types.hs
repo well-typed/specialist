@@ -14,6 +14,7 @@ import Data.Text (Text)
 import Data.Word
 import GHC.InfoProv
 import GHC.Plugins
+import GHC.Types.CostCentre.State
 import GHC.Types.DumpSpecInfo
 
 -------------------------------------------------------------------------------
@@ -60,6 +61,8 @@ data SpecialistEnv =
 data SpecialistState =
     SpecialistState
       { specialistStateLastSourceNote :: !(Maybe (RealSrcSpan, String))
+      , specialistStateCurrentModule :: !(Maybe Module)
+      , specialistStateCostCentreState :: CostCentreState
       , specialistStateUniqSupply :: UniqSupply
       , specialistStateInputSpecs :: !(Map Text (DumpSpecInfo Text Text Text))
       , specialistStateOverloadedCallCount :: !Integer
@@ -96,6 +99,13 @@ instance Monad m => MonadUnique (SpecialistT m) where
     modify $
       \st -> st { specialistStateUniqSupply = s }
     return u
+
+mkCcIndex :: Monad m => FastString -> SpecialistT m CostCentreIndex
+mkCcIndex nm = do
+    s@SpecialistState{..} <- get
+    let (ix, ccs) = getCCIndex nm specialistStateCostCentreState
+    put s { specialistStateCostCentreState = ccs }
+    return ix
 
 type SpecialistM = SpecialistT CoreM
 
