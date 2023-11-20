@@ -12,11 +12,13 @@ import GHC.Specialist.Plugin.Types
 import Control.Monad.State.Strict
 import Control.Monad.Reader
 import Data.Maybe
+import Data.Set qualified as Set
 import GHC.Core
 import GHC.Core.Predicate
 import GHC.Core.TyCo.Rep (Scaled (..))
 import GHC.Plugins
 import GHC.Types.CostCentre
+import GHC.Types.CostCentre.State
 import GHC.Types.Tickish
 import GHC.Types.TyThing
 
@@ -28,51 +30,43 @@ import GHC.Types.TyThing
 plugin :: Plugin
 plugin =
     defaultPlugin
-      { installCoreToDos = \opts todos -> do
-          specialistEnv <- mkSpecialistEnv opts
-          specialistState <- initSpecialistState specialistEnv
-          evalSpecialist specialistEnv specialistState (install todos)
+      { latePlugin = \hsc_env opts (cgs, cc_state) -> do
+          specialistEnv <- mkSpecialistEnv hsc_env opts
+          specialistState <- initSpecialistState (cg_module cgs) cc_state specialistEnv
+          evalSpecialist
+            specialistEnv
+            specialistState
+            (specialist (cgs, cc_state))
       , pluginRecompile = purePlugin
       }
 
--- | Install Specialist at the end of the core-to-core passes.
-install :: [CoreToDo] -> SpecialistM [CoreToDo]
-install todos = do
-    slogV "Inserting Specialist plugin at end of compilation pipeline"
-    todo <- specialist
-
-    -- Insert Specialist at the end of the compilation todos
-    return $ foldr (:) [todo] todos
-
 -- | Specialist's core-to-core pass. Prints a message stating which module we
 -- are operating on and then traverses the core bindings with 'processBind'.
-specialist :: SpecialistM CoreToDo
-specialist = do
-    specialistEnv <- ask
-    specialistState <- get
-    return $ CoreDoPluginPass "specialist" $
-      \mgs@ModGuts{..} -> do
-        let
-          currentModuleString = moduleNameString (moduleName mg_module)
+specialist
+  :: (CgGuts, CostCentreState)
+  -> SpecialistM (CgGuts, CostCentreState)
+specialist (cgs@CgGuts{..}, _) = do
+    let
+      currentModuleString = moduleNameString (moduleName cg_module)
 
-        slogCoreV specialistEnv $
-          "starting specialist plugin on module: " ++ currentModuleString
+    slogV $
+      "starting specialist plugin on module: " ++ currentModuleString
 
-        -- Process all top-level binders in the core program
-        (mg_binds', SpecialistState{..}) <-
-          runSpecialist
-            specialistEnv
-            specialistState
-              { specialistStateCurrentModule = Just mg_module
-              }
-            $ mapM processBind mg_binds
+    -- Process all top-level binders in the core program
+    cg_binds' <- mapM processBind cg_binds
+    SpecialistState{..} <- get
 
-        slogCoreV specialistEnv $
-          "specialist plugin found " ++
-          show specialistStateOverloadedCallCount ++ " overloaded calls in " ++
-          "module " ++ currentModuleString
+    slogV $
+      "specialist plugin found " ++ show specialistStateOverloadedCallCount ++
+      " overloaded calls in " ++ "module " ++ currentModuleString
 
-        return $ mgs { mg_binds = mg_binds' }
+    return
+      ( cgs
+          { cg_binds = cg_binds'
+          , cg_ccs = Set.toList specialistStateLocalCcs ++ cg_ccs
+          }
+      , specialistStateCostCentreState
+      )
 
 -------------------------------------------------------------------------------
 -- Plugin AST traversals
@@ -105,10 +99,15 @@ processExpr = \case
         resultTy = applyTypeToArgs empty (exprType f) xs
 
       -- We recursively process the arguments first so we don't have to traverse
-      -- the modified expression if it is overloaded.
-      oldS <- get
+      -- the modified expression if it is overloaded. Make sure we restore the
+      -- last source note for this location
+      oldSrcNote <- gets specialistStateLastSourceNote
       args <- mapM processExpr xs
-      put oldS
+      modify' $
+        \s -> s { specialistStateLastSourceNote = oldSrcNote }
+
+
+      name_cache <- asks (hsc_NC . specialistEnvHscEnv)
 
       if
            -- Check if any of the arguments are dictionaries
@@ -199,22 +198,22 @@ processExpr = \case
         slogVV resultTy
 
         -- Get the wrapper function
-        wrapperId <- lift $ do
-          mName <- thNameToGhcName 'specialistWrapper
+        wrapperId <- do
+          mName <- liftIO $ thNameToGhcNameIO name_cache 'specialistWrapper
           case mName of
             Just n -> lookupId n
             Nothing -> error "Specialist plugin failed to obtain the wrapper function"
 
         -- Get the Box type
-        boxType <- lift $ do
-          mName <- thNameToGhcName 'boxTypeDUMMY
+        boxType <- do
+          mName <- liftIO $ thNameToGhcNameIO name_cache 'boxTypeDUMMY
           case mName of
             Just n -> exprType . Var <$> lookupId n
             Nothing -> error "Specialist plugin failed to obtain the box type"
 
         -- Get the mkBox function
-        mkBoxId <- lift $ do
-          mName <- thNameToGhcName 'mkBox
+        mkBoxId <- do
+          mName <- liftIO $ thNameToGhcNameIO name_cache 'mkBox
           case mName of
             Just n -> lookupId n
             Nothing -> error "Specialist plugin failed to obtain the Box type"
@@ -224,7 +223,7 @@ processExpr = \case
           gets specialistStateLastSourceNote >>=
             \case
               Just (ss, l) -> do
-                dflags <- lift getDynFlags
+                dflags <- getDynFlags
                 return (showSDoc dflags (ppr ss), l)
               Nothing -> return ("", "")
 
@@ -284,21 +283,18 @@ processExpr = \case
 
         let
           overloadedCc =
-            ProfNote
-              ( mkUserCC
-                  cc_id_fs
-                  curMod
-                  ( fromMaybe
-                      (UnhelpfulSpan UnhelpfulNoLocationInfo)
-                      f_srcspan_maybe
-                  )
-                  (mkExprCCFlavour cc_index)
+            mkUserCC
+              cc_id_fs
+              curMod
+              ( fromMaybe
+                  (UnhelpfulSpan UnhelpfulNoLocationInfo)
+                  f_srcspan_maybe
               )
-              True
-              True
+              (mkExprCCFlavour cc_index)
+          overloadedTick = ProfNote overloadedCc True True
 
           wrappedApp =
-            mkTick overloadedCc $
+            mkTick overloadedTick $
               mkWildCase
                 wrapperApp
                 (Scaled OneTy (exprType wrapperApp))
@@ -308,6 +304,12 @@ processExpr = \case
 
         slogVV "Wrapped application:"
         slogVV wrappedApp
+
+        modify' $
+          \s@SpecialistState{..} ->
+            s { specialistStateLocalCcs =
+                  Set.insert overloadedCc specialistStateLocalCcs
+              }
 
         return wrappedApp
       else

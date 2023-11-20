@@ -10,12 +10,16 @@ import Control.Monad.Reader
 import Control.Monad.State.Strict
 import Data.Kind
 import Data.Map (Map)
+import Data.Set (Set)
 import Data.Text (Text)
 import Data.Word
 import GHC.InfoProv
 import GHC.Plugins
+import GHC.Tc.Utils.Env
+import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
 import GHC.Types.DumpSpecInfo
+import GHC.Types.TyThing
 
 -------------------------------------------------------------------------------
 -- Instrumentation types
@@ -56,12 +60,14 @@ data SpecialistEnv =
       { specialistEnvVerbosity :: !Verbosity
       , specialistEnvInputSpecsFile :: !FilePath
       , specialistEnvSampleProb :: !Double
+      , specialistEnvHscEnv :: !HscEnv
       }
 
 data SpecialistState =
     SpecialistState
       { specialistStateLastSourceNote :: !(Maybe (RealSrcSpan, String))
       , specialistStateCurrentModule :: !(Maybe Module)
+      , specialistStateLocalCcs :: !(Set CostCentre)
       , specialistStateCostCentreState :: CostCentreState
       , specialistStateUniqSupply :: UniqSupply
       , specialistStateInputSpecs :: !(Map Text (DumpSpecInfo Text Text Text))
@@ -100,6 +106,14 @@ instance Monad m => MonadUnique (SpecialistT m) where
       \st -> st { specialistStateUniqSupply = s }
     return u
 
+instance MonadIO m => MonadThings (SpecialistT m) where
+  lookupThing name = do
+    hsc_env <- asks specialistEnvHscEnv
+    liftIO $ lookupGlobal hsc_env name
+
+instance Monad m => HasDynFlags (SpecialistT m) where
+  getDynFlags = asks (hsc_dflags . specialistEnvHscEnv)
+
 mkCcIndex :: Monad m => FastString -> SpecialistT m CostCentreIndex
 mkCcIndex nm = do
     s@SpecialistState{..} <- get
@@ -107,7 +121,7 @@ mkCcIndex nm = do
     put s { specialistStateCostCentreState = ccs }
     return ix
 
-type SpecialistM = SpecialistT CoreM
+type SpecialistM = SpecialistT IO
 
 evalSpecialist
   :: Monad m

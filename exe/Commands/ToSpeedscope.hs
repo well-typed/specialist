@@ -69,35 +69,12 @@ processEvents elProf (Event _t ei _c) =
     HeapProfCostCentre n l m s _ ->
       elProf { cost_centres = CostCentre n l m s : cost_centres elProf }
     UserMessage msg | Just (SpecialistNote {..}) <- readMaybe (Text.unpack msg) ->
-      -- let
-      --   custom_cc_id :: Word32
-      --   custom_cc_id = fromIntegral . length $ cost_centres elProf
-
-      --   custom_cc_id_str :: Text
-      --   custom_cc_id_str = Text.pack $ show custom_cc_id
-
-      --   custom_cc_name :: Text
-      --   custom_cc_name =
-      --       case specialistNoteFunctionIpe of
-      --         Nothing -> "overloaded call #" <> custom_cc_id_str <> " (function IPE information unavailable)"
-      --         Just InfoProv{..} -> Text.pack ipLabel
-      -- in
         elProf
           { el_samples =
                 Sample
                   specialistNoteThreadId
-                  -- (custom_cc_id : specialistNoteCcIds)
                   specialistNoteCcIds
               : el_samples elProf
-          -- , cost_centres =
-          --       cost_centres elProf
-          --     ++
-          --       [ CostCentre
-          --           custom_cc_id
-          --           custom_cc_name
-          --           ""
-          --           (Text.pack $ show specialistNoteFunctionIpe)
-          --       ]
           }
     _ ->
       elProf

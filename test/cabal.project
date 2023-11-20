@@ -15,14 +15,10 @@ package *
 
 program-options
   ghc-options:
-    -finfo-table-map
-    -fdistinct-constructor-tables
-    -ddump-specialisations
-    -ddump-simpl
+    -- -ddump-specialisations
+    -ddump-stg-final
+    -ddump-asm
     -ddump-to-file
     -fplugin-opt=GHC.Specialist:f:1.0
     -fplugin-opt=GHC.Specialist:v
-
-package cabal-install
-  ghc-options:
     -ddump-timings

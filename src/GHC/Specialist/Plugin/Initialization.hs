@@ -9,6 +9,7 @@ import Data.List
 import Data.Map (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe
+import Data.Set qualified as Set
 import Data.Text (Text)
 import GHC.Plugins
 import GHC.Types.CostCentre.State
@@ -17,19 +18,23 @@ import GHC.Utils.Logger
 import System.Directory
 import Text.Read (readMaybe)
 
-defaultSpecialistEnv :: LogFlags -> SpecialistEnv
-defaultSpecialistEnv log_flags =
+defaultSpecialistEnv :: HscEnv -> SpecialistEnv
+defaultSpecialistEnv hsc_env@HscEnv{..} =
     SpecialistEnv
-      { specialistEnvVerbosity = Silent
-      , specialistEnvInputSpecsFile = logFlagsToDumpSpecsFile log_flags
-      , specialistEnvSampleProb = 0.01
+      { specialistEnvVerbosity =
+          Silent
+      , specialistEnvInputSpecsFile =
+          logFlagsToDumpSpecsFile (logFlags hsc_logger)
+      , specialistEnvSampleProb =
+          0.01
+      , specialistEnvHscEnv =
+          hsc_env
       }
 
 -- | Parse the plugin options into a 'SpecialistEnv'
-mkSpecialistEnv :: [CommandLineOption] -> CoreM SpecialistEnv
-mkSpecialistEnv opts = do
-    log_flags <- logFlags <$> getLogger
-    let init_env = defaultSpecialistEnv log_flags
+mkSpecialistEnv :: HscEnv -> [CommandLineOption] -> IO SpecialistEnv
+mkSpecialistEnv hsc_env opts = do
+    let init_env = defaultSpecialistEnv hsc_env
     pure $ foldl' parseOpts init_env opts
   where
     parseOpts :: SpecialistEnv -> CommandLineOption -> SpecialistEnv
@@ -61,19 +66,24 @@ logFlagsToDumpPrefix :: LogFlags -> String
 logFlagsToDumpPrefix LogFlags{..} =
    fromMaybe log_dump_prefix log_dump_prefix_override
 
-initSpecialistState :: SpecialistEnv -> CoreM SpecialistState
-initSpecialistState env = do
+initSpecialistState
+  :: Module
+  -> CostCentreState
+  -> SpecialistEnv
+  -> IO SpecialistState
+initSpecialistState curMod cc_state env = do
     let input_specs_file = specialistEnvInputSpecsFile env
-    slogCoreV env $ "Reading specialisations from file: " ++ input_specs_file
-    input_specs <- liftIO $ readDumpSpecInfosToMap input_specs_file
-    slogCoreVV env "Read input specialisations:"
-    slogCoreVV env $ show input_specs
-    uniqSupply <- liftIO $ mkSplitUniqSupply 'z'
+    slogVIO env $ "Reading specialisations from file: " ++ input_specs_file
+    input_specs <- readDumpSpecInfosToMap input_specs_file
+    slogVVIO env "Read input specialisations:"
+    slogVVIO env $ show input_specs
+    uniqSupply <- mkSplitUniqSupply 'z'
     return $
       SpecialistState
         { specialistStateLastSourceNote = Nothing
-        , specialistStateCurrentModule = Nothing
-        , specialistStateCostCentreState = newCostCentreState
+        , specialistStateCurrentModule = Just curMod
+        , specialistStateLocalCcs = Set.empty
+        , specialistStateCostCentreState = cc_state
         , specialistStateUniqSupply = uniqSupply
         , specialistStateInputSpecs = input_specs
         , specialistStateOverloadedCallCount = 0

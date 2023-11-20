@@ -10,51 +10,48 @@ import GHC.Specialist.Plugin.Types
 import Control.Monad.Reader
 import GHC.Plugins
 
-class CoreMLoggable a where
-  coreMLog :: a -> CoreM ()
+class SpecialistLoggable a where
+  slog :: SpecialistEnv -> a -> IO ()
 
-instance {-# OVERLAPPING #-} CoreMLoggable String where
-  coreMLog = putMsgS
+instance {-# OVERLAPPING #-} SpecialistLoggable String where
+  slog _ = putStrLn
 
-instance Outputable a => CoreMLoggable a where
-  coreMLog = putMsg . ppr
+instance Outputable a => SpecialistLoggable a where
+  slog env@SpecialistEnv{..} =
+    slog env . showPpr (hsc_dflags specialistEnvHscEnv)
 
 -------------------------------------------------------------------------------
 -- * Logging functions
 -------------------------------------------------------------------------------
 
 -- | Log only if very verbose output is enabled
-slogVV :: CoreMLoggable a => a -> SpecialistM ()
+slogVV :: SpecialistLoggable a => a -> SpecialistM ()
 slogVV x = do
     env <- ask
-    lift $ slogCoreVV env x
+    lift $ slogVVIO env x
 
 -- | Log only if very verbose output is enabled
-slogV :: CoreMLoggable a => a -> SpecialistM ()
+slogV :: SpecialistLoggable a => a -> SpecialistM ()
 slogV x = do
     env <- ask
-    lift $ slogCoreV env x
+    lift $ slogVIO env x
 
--- | Log no matter the verbosity
-slog :: CoreMLoggable a => a -> SpecialistM ()
-slog = lift . slogCore
-
--- | Log only if very verbose output is enabled, in the 'CoreM' monad.
-slogCoreVV :: CoreMLoggable a => SpecialistEnv -> a -> CoreM ()
-slogCoreVV SpecialistEnv{..} x =
+-- | Log only if very verbose output is enabled, in the 'IO' monad.
+slogVVIO :: SpecialistLoggable a => SpecialistEnv -> a -> IO ()
+slogVVIO env@SpecialistEnv{..} x =
     case specialistEnvVerbosity of
-      VeryVerbose -> coreMLog x
+      VeryVerbose -> slog env x
       Verbose -> return ()
       Silent -> return ()
 
--- | Log only if verbose output is enabled, in the 'CoreM' monad.
-slogCoreV :: CoreMLoggable a => SpecialistEnv -> a -> CoreM ()
-slogCoreV SpecialistEnv{..} x =
+-- | Log only if verbose output is enabled, in the 'IO' monad.
+slogVIO :: SpecialistLoggable a => SpecialistEnv -> a -> IO ()
+slogVIO env@SpecialistEnv{..} x =
     case specialistEnvVerbosity of
-      VeryVerbose -> coreMLog x
-      Verbose -> coreMLog x
+      VeryVerbose -> slog env x
+      Verbose -> slog env x
       Silent -> return ()
 
--- | Log no matter the verbosity, in the 'CoreM' monad.
-slogCore :: CoreMLoggable a => a -> CoreM ()
-slogCore = coreMLog
+-- | Log no matter the verbosity, in the 'IO' monad.
+slogIO :: SpecialistLoggable a => SpecialistEnv -> a -> IO ()
+slogIO = slog

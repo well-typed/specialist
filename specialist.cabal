@@ -65,7 +65,6 @@ executable specialyze
     , Commands.GroupNotes
     , Commands.ListNotes
     , Commands.Pragmas
-    , Commands.ToDot
     , Commands.ToSpeedscope
     , Utils
   build-depends:
