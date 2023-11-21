@@ -19,6 +19,7 @@ library
   exposed-modules:
       T3
     , T6
+    , T7B
 
 executable T1
   import: common-all
@@ -39,3 +40,10 @@ executable T5
   import: common-all
   main-is:
     unit-tests/T5.hs
+
+executable T7A
+  import: common-all
+  build-depends:
+    specialist-test
+  main-is:
+    unit-tests/T7A.hs

@@ -16,6 +16,8 @@ package *
 program-options
   ghc-options:
     -- -ddump-specialisations
+    -ddump-inlinings
+    -ddump-simpl
     -ddump-stg-final
     -ddump-asm
     -ddump-to-file
