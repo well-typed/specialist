@@ -6,3 +6,5 @@ cabal.project.local
 **/*.json
 **/*.html
 **/*.txt
+**/*.dump-*
+**/*.diff

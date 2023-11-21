@@ -73,10 +73,7 @@ initSpecialistState
   -> IO SpecialistState
 initSpecialistState curMod cc_state env = do
     let input_specs_file = specialistEnvInputSpecsFile env
-    slogVIO env $ "Reading specialisations from file: " ++ input_specs_file
-    input_specs <- readDumpSpecInfosToMap input_specs_file
-    slogVVIO env "Read input specialisations:"
-    slogVVIO env $ show input_specs
+    input_specs <- readDumpSpecInfosToMap env input_specs_file
     uniqSupply <- mkSplitUniqSupply 'z'
     return $
       SpecialistState
@@ -94,12 +91,17 @@ initSpecialistState curMod cc_state env = do
 -- generated.
 readDumpSpecInfosToMap
   :: MonadIO m
-  => FilePath
+  => SpecialistEnv
+  -> FilePath
   -> m (Map Text (DumpSpecInfo Text Text Text))
-readDumpSpecInfosToMap dump_file = liftIO $ do
-    dumpFileExists <- doesFileExist dump_file
-    if dumpFileExists then do
-      foldr go Map.empty <$> readDumpSpecInfosFromFile dump_file
+readDumpSpecInfosToMap env dump_file = liftIO $ do
+    exists <- doesFileExist dump_file
+    if exists then do
+      slogVIO env $ "Reading specialisations from file: " ++ dump_file
+      specs <- foldr go Map.empty <$> readDumpSpecInfosFromFile dump_file
+      slogVVIO env "Read input specialisations:"
+      slogVVIO env $ show specs
+      return specs
     else
       pure Map.empty
   where
