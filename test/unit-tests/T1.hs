@@ -5,7 +5,7 @@
 
 module Main where
 
--- Forces the application of $fShowList to the given dictionary. The application
+-- Causes the application of $fShowList to the given dictionary. The application
 -- of `f` here is obviously overloaded and should trigger output from the
 -- plugin. Also note that although the `$fShowList` function is overloaded, it
 -- should not trigger any output from the plugin when it is applied to the

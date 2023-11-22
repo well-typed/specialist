@@ -22,10 +22,6 @@ overloaded :: (Show a) => a -> String
 overloaded x = show x
 
 calls :: String
-calls =
-    overloaded (Just X)
-
-    -- Does not trigger?
-    -- ((\_ -> "hello") :: Show a => a -> String ) X
+calls = overloaded (Just X)
 
 
