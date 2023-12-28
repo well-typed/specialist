@@ -30,7 +30,7 @@ data SpecialistNote =
       { specialistNoteId :: String
       , specialistNoteCcs :: [String]
       , specialistNoteCcIds :: [Word32]
-      , specialistNoteDictInfos :: [Maybe DictInfo]
+      , specialistNoteDictInfos :: [DictInfo]
       , specialistNoteFunctionIpe :: Maybe InfoProv
       , specialistNoteLocationLabel :: String
       , specialistNoteLocationSpan :: String

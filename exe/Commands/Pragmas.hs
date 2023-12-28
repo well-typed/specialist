@@ -32,9 +32,9 @@ interpretPragmasCommand PragmasOptions{..} =
           perish $ "failed to get specialist notes from the input: " <> msg
   where
     go
-      :: Map (InfoProv, [Maybe DictInfo]) Integer
+      :: Map (InfoProv, [DictInfo]) Integer
       -> SpecialistNote
-      -> Map (InfoProv, [Maybe DictInfo]) Integer
+      -> Map (InfoProv, [DictInfo]) Integer
     go acc SpecialistNote{..} =
       case specialistNoteFunctionIpe of
         Just fIpe ->
@@ -43,7 +43,7 @@ interpretPragmasCommand PragmasOptions{..} =
           acc
 
     prettyPrint
-      :: Map (InfoProv, [Maybe DictInfo]) Integer
+      :: Map (InfoProv, [DictInfo]) Integer
       -> IO ()
     prettyPrint result = do
         mapM_ printOne
@@ -51,7 +51,7 @@ interpretPragmasCommand PragmasOptions{..} =
       . sortOn snd
       $ Map.toList result
 
-    printOne :: ((InfoProv, [Maybe DictInfo]), Integer) -> IO ()
+    printOne :: ((InfoProv, [DictInfo]), Integer) -> IO ()
     printOne ((fIpe, dictInfos), count) = do
       putStrLn "overloaded function with IPE information:"
       putStrLn $ "    " ++ show fIpe

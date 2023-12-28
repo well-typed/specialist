@@ -3,6 +3,8 @@ packages: .
 allow-newer:
   ghc-events:base
 
+tests: True
+
 package *
   ghc-options:
     -fexpose-all-unfoldings

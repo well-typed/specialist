@@ -9,7 +9,8 @@ import GHC.Specialist.Plugin.Types
 
 import Control.Concurrent
 import Control.Monad
-import Data.Maybe
+import Data.Set (Set)
+import Data.Set qualified as Set
 import Debug.Trace
 import GHC.Exts
 import GHC.Exts.Heap
@@ -23,23 +24,43 @@ import Unsafe.Coerce
 dictToBox :: forall c. Dict c -> Box
 dictToBox = unsafeCoerce
 
--- | Put a dictionary for a constrain in a box
+-- | Put a dictionary as a constraint in a box
 mkBox :: forall a. a => Box
 mkBox = dictToBox (Dict @a)
 
--- | Traverse free variables of a dictionary to determine the superclasses
-getDictInfo :: forall a. a -> IO (Maybe DictInfo)
-getDictInfo d = do
-    getClosureData d >>=
-      \case
-        ConstrClosure _ ptrs _ _ _ dcon_nm
-          | 'C':':':_ <- dcon_nm -> do
+-- | Traverse free variables of a dictionary to determine the superclasses. For
+-- some reason, the references to superclass dictionaries (sometimes?) go
+-- through the class functions, so we need to follow references through the
+-- functions without adding the functions themselves as superclasses.
+--
+-- Additionally, we would like to avoid adding the same superclass twice if it
+-- is referenced by two class functions. I.e., we only want to add superclasses
+-- encountered on distinct paths through other superclasses, not distinct paths
+-- through class functions. Therefore we accumulate the superclasses we have
+-- encountered as direct references from a closure in a set.
+getDictInfo :: forall a. Set DictInfo -> a -> IO (Set DictInfo)
+getDictInfo = go
+  where
+    go :: forall d. Set DictInfo -> d -> IO (Set DictInfo)
+    go acc d =
+      getClosureData d >>=
+        \case
+          ConstrClosure _ ptrs _ _ _ dcon_nm | 'C':':':_ <- dcon_nm -> do
             wf <- whereFrom d
-            frees <- catMaybes <$> mapM (\(Box fd) -> getDictInfo fd) ptrs
-            return . Just $ DictInfo wf frees
-        _ -> do
-          wf <- whereFrom d
-          return . Just $ DictInfo wf []
+
+            -- We reset the accumulator to the empty set here, since we no
+            -- longer wish to avoid adding duplicate superclasses (we may
+            -- encounter the same dictionary along a different path of
+            -- superclasses)
+            frees <- foldM (\scs (Box fd) -> go scs fd) Set.empty ptrs
+
+            return (Set.singleton $ DictInfo wf (Set.toList frees))
+          FunClosure _ ptrs _ ->
+            -- Use the same accumulator here, we do not consider references
+            -- through class functions as distinct
+            foldM (\scs (Box fd) -> go scs fd) acc ptrs
+          _ ->
+            return Set.empty
 
 {-# NOINLINE specialistWrapper' #-}
 specialistWrapper' :: forall a r (b :: TYPE r).
@@ -58,11 +79,11 @@ specialistWrapper' sampleProb fIdAddr lAddr ssAddr f boxedDicts =
           SpecialistNote (unpackCString# fIdAddr)
             <$> currentCallStack
             <*> (reverse <$> currentCallStackIds)
-            <*> mapM (\(Box d) -> getDictInfo d) boxedDicts
+            <*> (Set.toList <$> foldM (\acc (Box d) -> getDictInfo acc d) Set.empty boxedDicts)
             <*> whereFrom f
             <*> pure (unpackCString# lAddr)
             <*> pure (unpackCString# ssAddr)
-            <*> (fmap (fromIntegral . fst) $ myThreadId >>= threadCapability)
+            <*> fmap (fromIntegral . fst) (myThreadId >>= threadCapability)
 
 specialistWrapper :: forall a r (b :: TYPE r).
      Double

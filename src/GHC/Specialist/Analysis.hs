@@ -33,9 +33,7 @@ compareId (SpecialistNote cid1 _ _ _ _ _ _ _) (SpecialistNote cid2 _ _ _ _ _ _ _
 
 compareDictInfos :: SpecialistNote -> SpecialistNote -> Ordering
 compareDictInfos (SpecialistNote _ _ _ dis1 _ _ _ _) (SpecialistNote _ _ _ dis2 _ _ _ _) =
-    case (sequence dis1, sequence dis2) of
-      (Nothing, Nothing) -> GT
-      (dis1', dis2') -> compare dis1' dis2'
+    compare dis1 dis2
 
 compareFunctionIpe :: SpecialistNote -> SpecialistNote -> Ordering
 compareFunctionIpe (SpecialistNote _ _ _ _ fIpe1 _ _ _) (SpecialistNote _ _ _ _ fIpe2 _ _ _) =

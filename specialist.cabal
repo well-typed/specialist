@@ -21,11 +21,6 @@ common common
     LambdaCase
   build-depends:
       base >=4.18.0.0 && < 5
-  ghc-options:
-    -fexpose-all-unfoldings
-    -fspecialise-aggressively
-    -finfo-table-map
-    -fdistinct-constructor-tables
 
 library
   import: common
@@ -52,6 +47,10 @@ library
     , mtl
     , random
     , text
+  ghc-options:
+    -- Make sure the location of the specialistWrapper is reported in the plugin
+    -- output, for clarity
+    -finfo-table-map
 
 executable specialyze
   import: common
@@ -81,3 +80,40 @@ executable specialyze
     , mtl
     , optparse-applicative
     , text
+
+test-suite test-specialist
+  import: common
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+  other-modules:
+      Test.Specialist
+      Test.Specialist.Types
+      Test.Specialist.UnitTests.T1
+  build-depends:
+      specialist
+
+    , bytestring
+    , directory
+    , process
+    , tasty
+    , tasty-hunit
+    , tasty-golden
+  build-tool-depends:
+      specialist:specialyze
+    , specialist:test-T1
+  ghc-options:
+    -threaded
+
+executable test-T1
+  import: common
+  hs-source-dirs: test/unit-tests/T1
+  main-is: Main.hs
+  build-depends:
+      specialist
+  ghc-options:
+    -fplugin=GHC.Specialist
+    -fplugin-opt=GHC.Specialist:f:1.0
+    -fplugin-opt=GHC.Specialist:vv
+    -finfo-table-map
+    -fdistinct-constructor-tables

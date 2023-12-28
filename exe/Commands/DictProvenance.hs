@@ -9,12 +9,11 @@ import Control.Monad
 import Data.List
 import Data.Map (Map)
 import Data.Map.Strict qualified as Map
-import Data.Maybe
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Options.Applicative
 
-data DictProvenanceOptions =
+newtype DictProvenanceOptions =
     DictProvenanceOptions
       { dictProvenanceOptionsGetNotes :: IO (Either String [SpecialistNote])
       }
@@ -40,7 +39,7 @@ interpretDictProvenanceCommand DictProvenanceOptions{..} =
       -> SpecialistNote
       -> Map DictInfo (Set [String])
     go acc note@SpecialistNote{..} =
-      foldl' updateProvs acc (map (,note) $ catMaybes specialistNoteDictInfos)
+      foldl' updateProvs acc (map (,note) specialistNoteDictInfos)
 
     updateProvs
       :: Map DictInfo (Set [String])
