@@ -31,7 +31,8 @@ mkBox = dictToBox (Dict @a)
 -- | Traverse free variables of a dictionary to determine the superclasses. For
 -- some reason, the references to superclass dictionaries (sometimes?) go
 -- through the class functions, so we need to follow references through the
--- functions without adding the functions themselves as superclasses.
+-- functions and thunks without adding the functions or thunks themselves as
+-- superclasses.
 --
 -- Additionally, we would like to avoid adding the same superclass twice if it
 -- is referenced by two class functions. I.e., we only want to add superclasses
@@ -54,13 +55,16 @@ getDictInfo = go
             -- superclasses)
             frees <- foldM (\scs (Box fd) -> go scs fd) Set.empty ptrs
 
-            return (Set.singleton $ DictInfo wf (Set.toList frees))
-          FunClosure _ ptrs _ ->
+            return (Set.insert (DictInfo wf (Set.toList frees)) acc)
+          FunClosure _ ptrs _ -> do
             -- Use the same accumulator here, we do not consider references
             -- through class functions as distinct
             foldM (\scs (Box fd) -> go scs fd) acc ptrs
-          _ ->
-            return Set.empty
+          ThunkClosure _ ptrs _ -> do
+            -- Use the same accumulator here, we do not consider references
+            -- through thunks as distinct
+            foldM (\scs (Box fd) -> go scs fd) acc ptrs
+          _ -> return Set.empty
 
 {-# NOINLINE specialistWrapper' #-}
 specialistWrapper' :: forall a r (b :: TYPE r).

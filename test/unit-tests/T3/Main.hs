@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-missing-methods #-}
+
 module Main where
 
 data X = X
@@ -39,6 +41,10 @@ invoke5 f val = f val val
 invoke6 :: (forall a. (Show a, Num a, Eq a, Enum a, Ord a, Real a) => a -> a -> String) -> X -> String
 invoke6 f val = f val val
 
+{-# NOINLINE invoke7 #-}
+invoke7 :: (forall a. (Show a, Num a, Eq a, Enum a, Ord a, Real a, Integral a) => a -> a -> String) -> X -> String
+invoke7 f val = f val val
+
 main :: IO ()
 main = do
   putStrLn $ invoke0 (\_ _ -> "hello") X
@@ -48,3 +54,4 @@ main = do
   putStrLn $ invoke4 (\_ _ -> "hello") X
   putStrLn $ invoke5 (\_ _ -> "hello") X
   putStrLn $ invoke6 (\_ _ -> "hello") X
+  putStrLn $ invoke7 (\_ _ -> "hello") X

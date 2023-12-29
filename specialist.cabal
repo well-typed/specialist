@@ -14,7 +14,7 @@ build-type:         Simple
 extra-doc-files:    CHANGELOG.md
 
 common common
-  ghc-options: -Wall
+  ghc-options: -Wall -Wunused-packages
   default-language: GHC2021
   default-extensions:
     RecordWildCards
@@ -71,13 +71,10 @@ executable specialyze
     , aeson
     , containers
     , dir-traverse
-    , fgl
     , filepath
     , ghc
     , ghc-events
-    , graphviz
     , hs-speedscope
-    , mtl
     , optparse-applicative
     , text
 
@@ -90,25 +87,26 @@ test-suite test-specialist
       Test.Specialist
       Test.Specialist.Types
       Test.Specialist.UnitTests.T1
+      Test.Specialist.UnitTests.T2
+      Test.Specialist.UnitTests.T3
+      Test.Specialist.Utils
   build-depends:
       specialist
 
-    , bytestring
     , directory
     , process
     , tasty
     , tasty-hunit
-    , tasty-golden
   build-tool-depends:
       specialist:specialyze
     , specialist:test-T1
+    , specialist:test-T2
+    , specialist:test-T3
   ghc-options:
     -threaded
 
-executable test-T1
+common test-exe
   import: common
-  hs-source-dirs: test/unit-tests/T1
-  main-is: Main.hs
   build-depends:
       specialist
   ghc-options:
@@ -117,3 +115,19 @@ executable test-T1
     -fplugin-opt=GHC.Specialist:vv
     -finfo-table-map
     -fdistinct-constructor-tables
+    -dcore-lint
+
+executable test-T1
+  import: test-exe
+  hs-source-dirs: test/unit-tests/T1
+  main-is: Main.hs
+
+executable test-T2
+  import: test-exe
+  hs-source-dirs: test/unit-tests/T2
+  main-is: Main.hs
+
+executable test-T3
+  import: test-exe
+  hs-source-dirs: test/unit-tests/T3
+  main-is: Main.hs

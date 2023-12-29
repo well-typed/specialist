@@ -118,8 +118,8 @@ processExpr = \case
            -- type of the function is a dictionary type.
         && not (isDictTy resultTy)
 
-           -- Avoid instrumenting constraint selectors like eq_sel (TODO: Write
-           -- more about how these constraints occur. See tests/T3.hs)
+           -- Avoid instrumenting constraint selectors like eq_sel (See
+           -- tests/unit-tests/T3/Main.hs)
         && (typeTypeOrConstraint resultTy /= ConstraintLike)
 
            -- Avoid instrumenting join points
