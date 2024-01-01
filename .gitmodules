@@ -1,3 +1,0 @@
-[submodule "test/cabal"]
-	path = test/cabal
-	url = https://github.com/FinleyMcIlwaine/cabal.git

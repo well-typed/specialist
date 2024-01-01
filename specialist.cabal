@@ -89,6 +89,7 @@ test-suite test-specialist
       Test.Specialist.UnitTests.T1
       Test.Specialist.UnitTests.T2
       Test.Specialist.UnitTests.T3
+      Test.Specialist.UnitTests.T4
       Test.Specialist.Utils
   build-depends:
       specialist
@@ -102,6 +103,7 @@ test-suite test-specialist
     , specialist:test-T1
     , specialist:test-T2
     , specialist:test-T3
+    , specialist:test-T4
   ghc-options:
     -threaded
 
@@ -130,4 +132,9 @@ executable test-T2
 executable test-T3
   import: test-exe
   hs-source-dirs: test/unit-tests/T3
+  main-is: Main.hs
+
+executable test-T4
+  import: test-exe
+  hs-source-dirs: test/unit-tests/T4
   main-is: Main.hs
