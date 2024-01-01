@@ -9,10 +9,18 @@ that get evaluated.
 Add this plugin to `build-depends` and use `-fplugin=GHC.Specialist` on whatever
 modules you wish to instrument. To set a dynamic sample rate for plugin output,
 use `-fplugin-opt=GHC.Specialist:f:N` where `N` is the decimal probability of
-output being emitted anytime instrumentation is executed.
+output being emitted anytime instrumentation is executed. To set the plugin
+verbosity use `-fplugin-opt=GHC.Specialist:v` for verbose and
+`-fplugin-opt=GHC.Specialist:vv` for more verbose.
 
 ## Tests
 
-Currently, the test suite is implemented as golden tests. This could be better,
-since we could easily get our hands on the event log output of the test
-executables and work directly with the `SpecialistNotes` held in the event log.
+The test suite includes some basic unit tests. Each unit test consists of an
+instrumented executable (see the `test-TX` executables in the cabal file). These
+are included as `build-tool-depends` for the test suite, which executes the
+executables and retrieves the specialist notes from the event log output using
+the `specialyze` executable tool.
+
+Various conditions are then checked for each of the tests to ensure that the
+overloaded calls are what we expect and that the data included in the notes is
+accurate.
