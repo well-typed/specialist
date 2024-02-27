@@ -20,51 +20,51 @@ findAndRemove p (x:xs)
 -- a dictionary whose label string contains the given string.
 includesDictLabel :: String -> SpecialistNote -> Bool
 includesDictLabel s SpecialistNote{..} =
-    any (dictIncludesDictLabel s) specialistNoteDictInfos
+    any (dictIncludesDictLabel s . dictInfoClosure) specialistNoteDictInfos
 
 -- | Checks whether at least one of the dictionary infos in the note references
 -- a dictionary whose name string contains the given string.
 includesDictName :: String -> SpecialistNote -> Bool
 includesDictName s SpecialistNote{..} =
-    any (dictIncludesDictName s) specialistNoteDictInfos
+    any (dictIncludesDictName s . dictInfoClosure) specialistNoteDictInfos
 
--- | Checks whether the IPE label of the 'DictInfo' contains the given string.
-dictIncludesDictLabel :: String -> DictInfo -> Bool
+-- | Checks whether the IPE label of the 'DictClosure' contains the given string.
+dictIncludesDictLabel :: String -> DictClosure -> Bool
 dictIncludesDictLabel s =
-    maybe False ((s `isInfixOf`) . ipLabel) . dictInfoProv
+    maybe False ((s `isInfixOf`) . ipLabel) . dictClosureProv
 
--- | Checks whether the IPE name of the 'DictInfo' contains the given string.
-dictIncludesDictName :: String -> DictInfo -> Bool
+-- | Checks whether the IPE name of the 'DictClosure' contains the given string.
+dictIncludesDictName :: String -> DictClosure -> Bool
 dictIncludesDictName s =
-    maybe False ((s `isInfixOf`) . ipName) . dictInfoProv
+    maybe False ((s `isInfixOf`) . ipName) . dictClosureProv
 
 -- | Check that the dictionaries referenced in the note abide by some basic
 -- superclass relationships
 checkBasicSuperclasses :: SpecialistNote -> Assertion
 checkBasicSuperclasses SpecialistNote{..} =
-    mapM_ checkBasicDictSuperclasses specialistNoteDictInfos
+    mapM_ (checkBasicDictSuperclasses . dictInfoClosure) specialistNoteDictInfos
 
 -- | Check that the dictionaries referenced in the note abide by some basic
 -- superclass relationships from the Prelude in addition to those given.
 checkSuperclasses :: [(String, String)] -> SpecialistNote -> Assertion
 checkSuperclasses rs SpecialistNote{..} =
-    mapM_ (checkDictSuperclasses rs) specialistNoteDictInfos
+    mapM_ (checkDictSuperclasses rs . dictInfoClosure) specialistNoteDictInfos
 
 -- | Check that the dictionaries referenced in the note abide by the given
 -- superclass relationships.
 checkSuperclassesWith :: [(String, String)] -> SpecialistNote -> Assertion
 checkSuperclassesWith rs SpecialistNote{..} =
-    mapM_ (checkDictSuperclassesWith rs) specialistNoteDictInfos
+    mapM_ (checkDictSuperclassesWith rs . dictInfoClosure) specialistNoteDictInfos
 
 -- | Check some basic superclass relationships for the given dictionary and it's
 -- superclasses
-checkBasicDictSuperclasses :: DictInfo -> Assertion
+checkBasicDictSuperclasses :: DictClosure -> Assertion
 checkBasicDictSuperclasses = checkDictSuperclasses []
 
 -- | Check that the given superclass relationships in addition to some basic
 -- Prelude class relationships hold for the given dictionary and it's
 -- superclasses.
-checkDictSuperclasses :: [(String, String)] -> DictInfo -> Assertion
+checkDictSuperclasses :: [(String, String)] -> DictClosure -> Assertion
 checkDictSuperclasses =
     checkDictSuperclassesWith .
       (
@@ -81,14 +81,14 @@ checkDictSuperclasses =
 checkDictSuperclassesWith
   :: [(String, String)]
   -- ^ Assoc. list mapping classes to their expected superclasses
-  -> DictInfo
-  -- ^ 'DictInfo' to check
+  -> DictClosure
+  -- ^ 'DictClosure' to check
   -> Assertion
-checkDictSuperclassesWith rs di@DictInfo{..} = do
+checkDictSuperclassesWith rs di@DictClosure{..} = do
     mapM_ checkGivenRel rs
-    mapM_ (checkDictSuperclassesWith rs) dictInfoFreeDicts
+    mapM_ (checkDictSuperclassesWith rs) dictClosureFreeDicts
   where
     checkGivenRel (c, sc) =
       when (dictIncludesDictName c di) $
-        any (dictIncludesDictName sc) dictInfoFreeDicts @?
+        any (dictIncludesDictName sc) dictClosureFreeDicts @?
           "expect " ++ sc ++ " to be a superclass of " ++ c

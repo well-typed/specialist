@@ -39,10 +39,13 @@ mkBox = dictToBox (Dict @a)
 -- encountered on distinct paths through other superclasses, not distinct paths
 -- through class functions. Therefore we accumulate the superclasses we have
 -- encountered as direct references from a closure in a set.
-getDictInfo :: forall a. Set DictInfo -> a -> IO (Set DictInfo)
-getDictInfo = go
+getDictInfo :: (Box, String) -> IO DictInfo
+getDictInfo (Box dict, prettyType)=
+    Set.toList <$> go Set.empty dict >>= \case
+      [di] -> return (DictInfo prettyType di)
+      _ -> error "impossible: got more than one dict info for a single dict"
   where
-    go :: forall d. Set DictInfo -> d -> IO (Set DictInfo)
+    go :: forall d. Set DictClosure -> d -> IO (Set DictClosure)
     go acc d =
       getClosureData d >>=
         \case
@@ -55,7 +58,7 @@ getDictInfo = go
             -- superclasses)
             frees <- foldM (\scs (Box fd) -> go scs fd) Set.empty ptrs
 
-            return (Set.insert (DictInfo wf (Set.toList frees)) acc)
+            return (Set.insert (DictClosure wf (Set.toList frees)) acc)
           FunClosure _ ptrs _ -> do
             -- Use the same accumulator here, we do not consider references
             -- through class functions as distinct
@@ -73,7 +76,7 @@ specialistWrapper' :: forall a r (b :: TYPE r).
   -> Addr#
   -> Addr#
   -> (a -> b)
-  -> [Box]
+  -> [(Box, String)]
   -> ()
 specialistWrapper' sampleProb fIdAddr lAddr ssAddr f boxedDicts =
     unsafePerformIO $ do
@@ -83,7 +86,7 @@ specialistWrapper' sampleProb fIdAddr lAddr ssAddr f boxedDicts =
           SpecialistNote (unpackCString# fIdAddr)
             <$> currentCallStack
             <*> (reverse <$> currentCallStackIds)
-            <*> (Set.toList <$> foldM (\acc (Box d) -> getDictInfo acc d) Set.empty boxedDicts)
+            <*> mapM getDictInfo boxedDicts
             <*> whereFrom f
             <*> pure (unpackCString# lAddr)
             <*> pure (unpackCString# ssAddr)
@@ -100,8 +103,9 @@ specialistWrapper :: forall a r (b :: TYPE r).
   -- ^ Source span of the last source tick we encountered
   -> (a => b)
   -- ^ The overloaded function
-  -> [Box]
-  -- ^ 'Box'es holding the dictionaries used in the overloaded call
+  -> [(Box, String)]
+  -- ^ 'Box'es holding the dictionaries used in the overloaded call, paired with
+  -- their pretty-printed types
   -> ()
 specialistWrapper = unsafeCoerce specialistWrapper'
 

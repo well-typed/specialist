@@ -19,12 +19,9 @@ specT4 =
 getNotesT4 :: IO [SpecialistNote]
 getNotesT4 = do
     callCommand "test-T4 +RTS -l-au -RTS"
-    specialistNotesFromEventLogFile "test-T4.eventlog" >>= \case
-      Right notes -> do
-        removeFile "test-T4.eventlog"
-        return notes
-      Left  _ ->
-        assertFailure "failed to read specialist notes from test-T4.eventlog"
+    notes <- specialistNotesFromEventLogFile "test-T4.eventlog"
+    removeFile "test-T4.eventlog"
+    return notes
 
 testT4 :: [SpecialistNote] -> TestTree
 testT4 notes = testCase "T4" $ do

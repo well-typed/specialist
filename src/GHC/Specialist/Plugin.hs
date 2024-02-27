@@ -119,7 +119,7 @@ processExpr = \case
         && not (isDictTy resultTy)
 
            -- Avoid instrumenting constraint selectors like eq_sel (See
-           -- tests/unit-tests/T3/Main.hs)
+           -- tests/unit-tests/T2/Main.hs)
         && (typeTypeOrConstraint resultTy /= ConstraintLike)
 
            -- Avoid instrumenting join points
@@ -219,16 +219,32 @@ processExpr = \case
             Nothing -> error "Specialist plugin failed to obtain the Box type"
 
         -- Info arguments for the wrapper
+        dflags <- getDynFlags
         (ss, l) <-
           gets specialistStateLastSourceNote >>=
             \case
-              Just (ss, l) -> do
-                dflags <- getDynFlags
+              Just (ss, l) ->
                 return (showSDoc dflags (ppr ss), l)
-              Nothing -> return ("", "")
+              Nothing ->
+                return ("", "")
 
         uniqId <- show <$> getUniqueM
         sampleProb <- asks specialistEnvSampleProb
+
+        dictTyPairs <-
+          mapM
+            ( \d -> do
+                tyStr <- mkStringExpr (showPpr dflags $ exprType d)
+                return $
+                  mkCoreConApps
+                    (tupleDataCon Boxed 2)
+                    [ Type $ exprType $ mkCoreApps (Var mkBoxId) [Type $ exprType d, d]
+                    , Type stringTy
+                    , mkCoreApps (Var mkBoxId) [Type $ exprType d, d]
+                    , tyStr
+                    ]
+            )
+            dicts
         let
           fIdStr = mkStringLit uniqId
           lStr = mkStringLit l
@@ -245,56 +261,65 @@ processExpr = \case
               , lStr
               , ssStr
               , f'
-              , mkListExpr boxType $
-                  map
-                    ( \d ->
-                        mkCoreApps (Var mkBoxId) [Type $ exprType d, d]
-                    )
-                    dicts
+              , mkListExpr (mkTupleTy Boxed [boxType, stringTy]) dictTyPairs
               ]
 
 
         -----------------------------------------------------------------------
         -- Cost centre insertion
         -----------------------------------------------------------------------
+        insertCCs <- asks specialistEnvCostCenters
 
-        -- What is the current module?
-        curMod <-
-          gets specialistStateCurrentModule >>= \case
-            Just m ->
-              return m
-            Nothing ->
-              error "Specialist plugin could not determine current module"
+        ccWrap <-
+          if insertCCs then do
+            -- What is the current module?
+            curMod <-
+              gets specialistStateCurrentModule >>= \case
+                Just m ->
+                  return m
+                Nothing ->
+                  error "Specialist plugin could not determine current module"
 
-        -- Extract a name and source location from the function being applied
+            -- Extract a name and source location from the function being applied
+            let
+              !f_name_maybe = exprName app
+              f_srcspan_maybe = nameSrcSpan <$> f_name_maybe
+              cc_id_fs =
+                fsLit $
+                  "<OVERLOADED call to function: " ++
+                  maybe "(no name available)" getOccString f_name_maybe ++
+                  "> call id " ++ uniqId
+
+            -- Cost centre index
+            -- Note: This should always be zero, since we include the unique call
+            -- site ID in the name
+            cc_index <- mkCcIndex cc_id_fs
+
+            let
+              overloadedCc =
+                mkUserCC
+                  cc_id_fs
+                  curMod
+                  ( fromMaybe
+                      (UnhelpfulSpan UnhelpfulNoLocationInfo)
+                      f_srcspan_maybe
+                  )
+                  (mkExprCCFlavour cc_index)
+              overloadedTick = ProfNote overloadedCc True True
+
+            modify' $
+              \s@SpecialistState{..} ->
+                s { specialistStateLocalCcs =
+                      Set.insert overloadedCc specialistStateLocalCcs
+                  }
+
+            return $ mkTick overloadedTick
+          else
+            return id
+
         let
-          !f_name_maybe = exprName app
-          f_srcspan_maybe = nameSrcSpan <$> f_name_maybe
-          cc_id_fs =
-            fsLit $
-              "<OVERLOADED call to function: " ++
-              maybe "(no name available)" getOccString f_name_maybe ++
-              "> call id " ++ uniqId
-
-        -- Cost centre index
-        -- Note: This should always be zero, since we include the unique call
-        -- site ID in the name
-        cc_index <- mkCcIndex cc_id_fs
-
-        let
-          overloadedCc =
-            mkUserCC
-              cc_id_fs
-              curMod
-              ( fromMaybe
-                  (UnhelpfulSpan UnhelpfulNoLocationInfo)
-                  f_srcspan_maybe
-              )
-              (mkExprCCFlavour cc_index)
-          overloadedTick = ProfNote overloadedCc True True
-
           wrappedApp =
-            mkTick overloadedTick $
+            ccWrap $
               mkWildCase
                 wrapperApp
                 (Scaled OneTy (exprType wrapperApp))
@@ -304,12 +329,6 @@ processExpr = \case
 
         slogVV "Wrapped application:"
         slogVV wrappedApp
-
-        modify' $
-          \s@SpecialistState{..} ->
-            s { specialistStateLocalCcs =
-                  Set.insert overloadedCc specialistStateLocalCcs
-              }
 
         return wrappedApp
       else

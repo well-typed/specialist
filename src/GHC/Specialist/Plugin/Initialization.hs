@@ -1,6 +1,5 @@
 module GHC.Specialist.Plugin.Initialization where
 
-import GHC.Specialist.Analysis.DumpSpecialisations
 import GHC.Specialist.Plugin.Logging
 import GHC.Specialist.Plugin.Types
 
@@ -29,6 +28,8 @@ defaultSpecialistEnv hsc_env@HscEnv{..} =
           0.01
       , specialistEnvHscEnv =
           hsc_env
+      , specialistEnvCostCenters =
+          False
       }
 
 -- | Parse the plugin options into a 'SpecialistEnv'
@@ -48,10 +49,15 @@ mkSpecialistEnv hsc_env opts = do
         env { specialistEnvVerbosity = VeryVerbose }
 
       -- An occurrence of "f:X" where X parses as a Double means the user has
-      -- requests a sample probability of X (e.g. 0.01 means 1% sample
+      -- requested a sample probability of X (e.g. 0.01 means 1% sample
       -- probability)
       'f':':':freqStr | Just freq <- readMaybe freqStr ->
         env { specialistEnvSampleProb = freq }
+
+      -- An occurrence of "ccs" means the user has requested cost center
+      -- insertion
+      "ccs" ->
+        env { specialistEnvCostCenters = True }
 
       -- Any other argument means the user is overriding the location of dump
       -- output to read for this module
@@ -98,7 +104,10 @@ readDumpSpecInfosToMap env dump_file = liftIO $ do
     exists <- doesFileExist dump_file
     if exists then do
       slogVIO env $ "Reading specialisations from file: " ++ dump_file
-      specs <- foldr go Map.empty <$> readDumpSpecInfosFromFile dump_file
+      -- TODO: Would be interesting to flesh this out more. What sort of things
+      -- could the plugin do if it knew what specializations were already
+      -- generated in this module?
+      specs <- pure Map.empty -- foldr go Map.empty <$> readDumpSpecInfosFromFile dump_file
       slogVVIO env "Read input specialisations:"
       slogVVIO env $ show specs
       return specs

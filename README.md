@@ -1,10 +1,15 @@
-# Spacialist Plugin
+# The specialist GHC plugin
 
-Detects and instruments overloaded function applications during compilation. At
-runtime, the instrumentation will emit information about the overloaded calls
-that get evaluated.
+This is a GHC plugin that detects and instruments overloaded function
+applications during compilation. At runtime, the instrumentation emits
+information about the overloaded calls whenever they are evaluated.
 
 ## Usage
+
+> [!IMPORTANT]
+> This plugin relies on several unmerged features in GHC. Use this
+> GHC branch for compatibility:
+> [https://gitlab.haskell.org/ghc/ghc/-/tree/wip/9.6-specialist-compat](https://gitlab.haskell.org/ghc/ghc/-/tree/wip/9.6-specialist-compat).
 
 Add this plugin to `build-depends` and use `-fplugin=GHC.Specialist` on whatever
 modules you wish to instrument. To set a dynamic sample rate for plugin output,

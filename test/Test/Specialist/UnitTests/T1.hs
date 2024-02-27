@@ -20,12 +20,9 @@ specT1 =
 getNotesT1 :: IO [SpecialistNote]
 getNotesT1 = do
     callCommand "test-T1 +RTS -l-au -RTS"
-    specialistNotesFromEventLogFile "test-T1.eventlog" >>= \case
-      Right notes -> do
-        removeFile "test-T1.eventlog"
-        return notes
-      Left  _ ->
-        assertFailure "failed to read specialist notes from test-T1.eventlog"
+    notes <- specialistNotesFromEventLogFile "test-T1.eventlog"
+    removeFile "test-T1.eventlog"
+    return notes
 
 testT1 :: [SpecialistNote] -> TestTree
 testT1 notes = testCase "T1" $ do
@@ -46,16 +43,16 @@ testT1 notes = testCase "T1" $ do
     showListDict <-
       case specialistNoteDictInfos showListNote of
         [d] ->
-          return d
+          return $ dictInfoClosure d
         _ ->
           assertFailure "expect one dictionary in the call that includes the ShowList dictionary constructor"
     showXDict <-
-      case dictInfoFreeDicts showListDict of
+      case dictClosureFreeDicts showListDict of
         [d] ->
           return d
         _ ->
           assertFailure "expect exactly one superclass referenced in the call including the $fShowList dictionary"
-    case dictInfoProv showXDict of
+    case dictClosureProv showXDict of
       Just InfoProv{..} ->
         "$fShowX" == ipLabel @?
           "expect the $fShowX dictionary to be the superclass referenced by the $fShowList constructor"

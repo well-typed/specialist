@@ -1,8 +1,5 @@
 module Commands.DictProvenance where
 
-import Commands.Common
-import Utils
-
 import GHC.Specialist.Plugin.Types
 
 import Control.Monad
@@ -11,28 +8,10 @@ import Data.Map (Map)
 import Data.Map.Strict qualified as Map
 import Data.Set (Set)
 import Data.Set qualified as Set
-import Options.Applicative
 
-newtype DictProvenanceOptions =
-    DictProvenanceOptions
-      { dictProvenanceOptionsGetNotes :: IO (Either String [SpecialistNote])
-      }
-
--- | Parse the options for the @dict-provenance@ command.
-dictProvenanceOptions :: Parser DictProvenanceOptions
-dictProvenanceOptions =
-        DictProvenanceOptions
-    <$> notesInput
-    <**> helper
-
-interpretDictProvenanceCommand :: DictProvenanceOptions -> IO ()
-interpretDictProvenanceCommand DictProvenanceOptions{..} =
-    dictProvenanceOptionsGetNotes >>=
-      \case
-        Right notes ->
-          prettyPrint $ foldl' go Map.empty notes
-        Left msg ->
-          perish $ "failed to get specialist notes from the input: " <> msg
+dictProvenance :: [SpecialistNote] -> IO ()
+dictProvenance notes =
+    pretty $ foldl' go Map.empty notes
   where
     go
       :: Map DictInfo (Set [String])
@@ -79,10 +58,10 @@ interpretDictProvenanceCommand DictProvenanceOptions{..} =
                   -- paths, just add it
                   Map.insert d (Set.insert path paths) acc
 
-    prettyPrint
+    pretty
       :: Map DictInfo (Set [String])
       -> IO ()
-    prettyPrint result = do
+    pretty result = do
       putStrLn "Dictionary provenances:"
       void $ Map.traverseWithKey prettyPrintDictProv result
 

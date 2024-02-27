@@ -1,28 +1,27 @@
 module Commands.ListNotes where
 
-import Commands.Common
-import Utils
-
 import GHC.Specialist.Plugin.Types
-
 import Options.Applicative
 
-data ListNotesOptions =
-    ListNotesOptions
-      { listNotesOptionsGetNotes :: IO (Either String [SpecialistNote])
-      }
 
--- | Parse the options for the @list@ command.
+data ListNotesOptions =
+      ListNotesOptions
+        -- | 'True': Raw 'show' output. 'False': Pretty output
+        !Bool
+  deriving (Show, Read, Eq)
+
 listNotesOptions :: Parser ListNotesOptions
 listNotesOptions =
-         ListNotesOptions <$> notesInput
-    <**> helper
+    ListNotesOptions <$>
+      switch
+        (    long "raw"
+          <> help "Do not pretty print the output"
+        )
 
-interpretListNotesCommand :: ListNotesOptions -> IO ()
-interpretListNotesCommand ListNotesOptions{..} =
-    listNotesOptionsGetNotes >>=
-      \case
-        Right notes ->
-          mapM_ print notes
-        Left msg ->
-          perish $ "failed to get specialist notes from the input: " <> msg
+listNotes :: ListNotesOptions -> [SpecialistNote] -> IO ()
+listNotes (ListNotesOptions raw) =
+    mapM_ $
+      if raw then
+        print
+      else
+        putStrLn . prettyPrint

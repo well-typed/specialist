@@ -1,8 +1,6 @@
 module Commands.Pragmas where
 
-import Commands.Common
 import GHC.Specialist
-import Utils
 
 import Data.List
 import Data.Map (Map)
@@ -12,51 +10,74 @@ import Options.Applicative
 
 data PragmasOptions =
     PragmasOptions
-      { pragmasOptionsGetNotes :: IO (Either String [SpecialistNote])
-      }
+      -- | Omit notes for functions whose IPE information indicates they are
+      -- defined in modules containing these substrings
+      [String]
+  deriving (Show, Read, Eq)
 
 -- | Parse the options for the @pragmas@ command.
 pragmasOptions :: Parser PragmasOptions
 pragmasOptions =
         PragmasOptions
-    <$> notesInput
+    <$> many
+          ( strOption
+              (    long "omit-modules"
+                <> metavar "SUBSTRING"
+                <> help
+                      ( "Omit overloaded functions originating from modules " ++
+                        "whose names contain SUBSTRING"
+                      )
+              )
+          )
     <**> helper
 
-interpretPragmasCommand :: PragmasOptions -> IO ()
-interpretPragmasCommand PragmasOptions{..} =
-    pragmasOptionsGetNotes >>=
-      \case
-        Right notes ->
-          prettyPrint $ foldl' go Map.empty notes
-        Left msg ->
-          perish $ "failed to get specialist notes from the input: " <> msg
+pragmas :: PragmasOptions -> [SpecialistNote] -> IO ()
+pragmas (PragmasOptions omitModules) =
+    pretty . foldl' go Map.empty
   where
     go
       :: Map (InfoProv, [DictInfo]) Integer
       -> SpecialistNote
       -> Map (InfoProv, [DictInfo]) Integer
     go acc SpecialistNote{..} =
-      case specialistNoteFunctionIpe of
-        Just fIpe ->
-          Map.insertWith (+) (fIpe, specialistNoteDictInfos) 1 acc
-        Nothing ->
-          acc
+        case specialistNoteFunctionIpe of
+          Just fIpe ->
+            if omitNote fIpe then
+              acc
+            else
+              Map.insertWith (+) (fIpe, specialistNoteDictInfos) 1 acc
+          Nothing ->
+            acc
+      where
+        omitNote ipe = any (\m -> m `isInfixOf` ipMod ipe) omitModules
 
-    prettyPrint
+
+    pretty
       :: Map (InfoProv, [DictInfo]) Integer
       -> IO ()
-    prettyPrint result = do
-        mapM_ printOne
-      . reverse
-      . sortOn snd
-      $ Map.toList result
+    pretty result = do
+          mapM_ printOne
+        . reverse
+        . sortOn snd
+        $ Map.toList result
 
     printOne :: ((InfoProv, [DictInfo]), Integer) -> IO ()
-    printOne ((fIpe, dictInfos), count) = do
-      putStrLn "overloaded function with IPE information:"
-      putStrLn $ "    " ++ show fIpe
-      putStrLn $ "was called " ++ show count ++ " times with dictionaries " ++
-                 "having the following IPE information:"
-      mapM_ (putStrLn . ("    " ++) . show) dictInfos
-      putStrLn ""
-
+    printOne ((ip, dictInfos), count) = do
+        putStrLn $ concat
+          [ ipMod ip, ".", ipLabel ip
+          , " (", ipSrcFile ip, ":", ipSrcSpan ip, ")"
+          ]
+        putStrLn $
+          "  called " ++ show count ++ " times with dictionaries: "
+        mapM_
+          ( \(DictInfo t c) -> do
+              putStr $ "    " ++ t
+              case dictClosureProv c of
+                Just InfoProv{..} ->
+                  putStrLn $
+                    " (" ++ ipMod ++ "." ++ ipLabel ++ " " ++
+                    ipSrcFile ++ ":" ++ ipSrcSpan ++ ")"
+                Nothing ->
+                  putStrLn ""
+          )
+          dictInfos

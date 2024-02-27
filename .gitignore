@@ -1,6 +1,7 @@
 dist-newstyle
 cabal.project.local
 .envrc
+.vscode
 **/*.prof
 **/*.eventlog
 **/*.json
@@ -8,3 +9,4 @@ cabal.project.local
 **/*.txt
 **/*.dump-*
 **/*.diff
+docs

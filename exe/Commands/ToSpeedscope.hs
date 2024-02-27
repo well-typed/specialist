@@ -2,17 +2,12 @@
 
 module Commands.ToSpeedscope where
 
-import Commands.Common
 import GHC.Specialist
-import Utils
 
 import Data.Aeson
 import Data.Maybe
--- import Data.Text (Text)
 import Data.Text qualified as Text
--- import Data.Word (Word32)
 import GHC.RTS.Events
--- import GHC.InfoProv
 import HsSpeedscope
 import Options.Applicative
 import System.FilePath
@@ -20,16 +15,15 @@ import Text.Read
 
 data ToSpeedscopeOptions =
     ToSpeedscopeOptions
-      { toSpeedscopeOptionsEventLogFile :: FilePath
-      , toSpeedscopeOptionsOutFile :: Maybe FilePath
+      { toSpeedscopeOptionsOutFile :: Maybe FilePath
       }
+  deriving (Show, Read, Eq)
 
 -- | Parse the options for the @to-speedscope@ command.
 toSpeedscopeOptions :: Parser ToSpeedscopeOptions
 toSpeedscopeOptions =
         ToSpeedscopeOptions
-    <$> eventLogFileInput
-    <*> optional
+    <$> optional
           ( strOption
               (    long "out"
                 <> short 'o'
@@ -39,9 +33,9 @@ toSpeedscopeOptions =
           )
     <**> helper
 
-interpretToSpeedscopeCommand :: ToSpeedscopeOptions -> IO ()
-interpretToSpeedscopeCommand ToSpeedscopeOptions{..} =
-    readEventLogFromFile toSpeedscopeOptionsEventLogFile >>=
+toSpeedscope :: ToSpeedscopeOptions -> FilePath -> IO ()
+toSpeedscope ToSpeedscopeOptions{..} eventLogFile =
+    readEventLogFromFile eventLogFile >>=
       \case
         Right eventLog ->
           encodeFile (fromMaybe eventLogFileJSON toSpeedscopeOptionsOutFile) $
@@ -51,9 +45,9 @@ interpretToSpeedscopeCommand ToSpeedscopeOptions{..} =
               processEvents
               eventLog
         Left msg ->
-          perish $ "failed to read event log: " <> msg
+          fail $ "failed to read event log: " <> msg
   where
-    eventLogFileJSON = takeFileName toSpeedscopeOptionsEventLogFile ++ ".json"
+    eventLogFileJSON = takeFileName eventLogFile ++ ".json"
 
 -- | Default processing function to convert profiling events into a classic speedscope
 -- profile

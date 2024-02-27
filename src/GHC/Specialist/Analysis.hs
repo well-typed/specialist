@@ -2,14 +2,8 @@
 -- Functions for analyzing output from the specialist plugin.
 
 module GHC.Specialist.Analysis
-  ( -- * Analyzing -ddump-specialisations output
-    module GHC.Specialist.Analysis.DumpSpecialisations
-
-    -- * Analyzing event log output
-  , module GHC.Specialist.Analysis.EventLog
-
-    -- * Analyzing text files containing 'SpecialistNote's
-  , module GHC.Specialist.Analysis.TextFile
+  ( -- * Analyzing event log output
+    module GHC.Specialist.Analysis.EventLog
 
     -- * Comparing 'SpecialistNote's
   , compareId
@@ -18,9 +12,7 @@ module GHC.Specialist.Analysis
   , compareLocationLabel
   ) where
 
-import GHC.Specialist.Analysis.DumpSpecialisations
 import GHC.Specialist.Analysis.EventLog
-import GHC.Specialist.Analysis.TextFile
 import GHC.Specialist.Plugin.Types
 
 -------------------------------------------------------------------------------

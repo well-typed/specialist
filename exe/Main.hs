@@ -10,8 +10,8 @@ main = do
   where
     opts :: ParserInfo SpecialyzeCommand
     opts =
-      info
-        (specialyzeCommand <**> helper)
-        (    header "specialyze"
-          <> progDesc "Analyze output from the specialist plugin"
-        )
+        info
+          (specialyzeCommand <**> helper)
+          (    header "specialyze"
+            <> progDesc "Analyze output from the specialist plugin"
+          )

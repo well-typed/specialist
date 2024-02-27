@@ -1,8 +1,5 @@
 module Commands.GroupNotes where
 
-import Commands.Common
-import Utils
-
 import GHC.Specialist.Analysis
 import GHC.Specialist.Plugin.Types
 
@@ -11,26 +8,41 @@ import Data.List
 import Options.Applicative
 import Text.Read (readMaybe)
 
+-------------------------------------------------------------------------------
+-- Parsing options
+-------------------------------------------------------------------------------
+
 data GroupNotesOptions =
     GroupNotesOptions
-      { groupNotesOptionsGetNotes :: IO (Either String [SpecialistNote])
-      , groupNotesOptionsGroupOn :: GroupNotesOn
-      , groupNotesOptionsSep :: Maybe String
-      }
+      -- | How to group the notes
+      !GroupNotesOn
 
+      -- | Group separator
+      (Maybe String)
+  deriving (Show, Read, Eq)
+
+-- | Supported grouping methods
 data GroupNotesOn =
       GroupNotesOnId
     | GroupNotesOnDictInfos
     | GroupNotesOnFunctionIpe
     | GroupNotesOnLocationLabel
-  deriving Read
+  deriving (Show, Read, Eq)
+
+-- | Convert a 'GroupNotesOn' to an ordering function for use with 'sortBy'.
+toComparison :: GroupNotesOn -> SpecialistNote -> SpecialistNote -> Ordering
+toComparison =
+    \case
+      GroupNotesOnId -> compareId
+      GroupNotesOnDictInfos -> compareDictInfos
+      GroupNotesOnFunctionIpe -> compareFunctionIpe
+      GroupNotesOnLocationLabel -> compareLocationLabel
 
 -- | Parse the options for the @group@ command.
 groupNotesOptions :: Parser GroupNotesOptions
 groupNotesOptions =
         GroupNotesOptions
-    <$> notesInput
-    <*> groupNotesOn
+    <$> groupNotesOn
     <*> optional
           ( strOption
               (    long "sep"
@@ -41,6 +53,7 @@ groupNotesOptions =
           )
     <**> helper
 
+-- | Parse the grouping option
 groupNotesOn :: Parser GroupNotesOn
 groupNotesOn =
     option (maybeReader parseGroupNotesOn)
@@ -50,38 +63,32 @@ groupNotesOn =
                "(\"id\", \"dict-info\", \"function-ipe\", or \"location-label\")"
              )
       )
+  where
+    parseGroupNotesOn :: String -> Maybe GroupNotesOn
+    parseGroupNotesOn "id"             = Just GroupNotesOnId
+    parseGroupNotesOn "dict-info"      = Just GroupNotesOnDictInfos
+    parseGroupNotesOn "function-ipe"   = Just GroupNotesOnFunctionIpe
+    parseGroupNotesOn "location-label" = Just GroupNotesOnLocationLabel
+    parseGroupNotesOn x                = readMaybe x
 
-parseGroupNotesOn :: String -> Maybe GroupNotesOn
-parseGroupNotesOn "id"             = Just GroupNotesOnId
-parseGroupNotesOn "dict-info"      = Just GroupNotesOnDictInfos
-parseGroupNotesOn "function-ipe"   = Just GroupNotesOnFunctionIpe
-parseGroupNotesOn "location-label" = Just GroupNotesOnLocationLabel
-parseGroupNotesOn x                = readMaybe x
+-------------------------------------------------------------------------------
+-- Logic
+-------------------------------------------------------------------------------
 
-interpretGroupNotesCommand :: GroupNotesOptions -> IO ()
-interpretGroupNotesCommand GroupNotesOptions{..} =
-    groupNotesOptionsGetNotes >>=
-      \case
-        Right notes@(n:_) ->
-          foldM_ go n $ sortBy comparison notes
-        Right [] -> return ()
-        Left msg ->
-          perish $ "failed to get specialist notes from the input: " ++ msg
+groupNotes :: GroupNotesOptions -> [SpecialistNote] -> IO ()
+groupNotes _                                []           = return ()
+groupNotes (GroupNotesOptions groupOn msep) (note:notes) =
+    foldM_ go note $ sortBy comparison notes
   where
     go :: SpecialistNote -> SpecialistNote -> IO SpecialistNote
     go prev n = do
-      case (comparison prev n, groupNotesOptionsSep) of
-        (EQ, _) ->
-          return ()
-        (_, Just sep) ->
-          putStrLn sep
-        _ -> return ()
-      print n >> return n
+        case (comparison prev n, msep) of
+          (EQ, _) ->
+            return ()
+          (_, Just sep) ->
+            putStrLn sep
+          _ -> return ()
+        print n >> return n
 
     comparison :: SpecialistNote -> SpecialistNote -> Ordering
-    comparison =
-      case groupNotesOptionsGroupOn of
-        GroupNotesOnId -> compareId
-        GroupNotesOnDictInfos -> compareDictInfos
-        GroupNotesOnFunctionIpe -> compareFunctionIpe
-        GroupNotesOnLocationLabel -> compareLocationLabel
+    comparison = toComparison groupOn

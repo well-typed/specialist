@@ -34,17 +34,33 @@ data SpecialistNote =
       , specialistNoteFunctionIpe :: Maybe InfoProv
       , specialistNoteLocationLabel :: String
       , specialistNoteLocationSpan :: String
-      , specialistNoteThreadId :: Word32
+      , specialistNoteThreadId :: !Word32
       }
   deriving (Show, Read, Eq, Ord)
+
+prettyPrint :: SpecialistNote -> String
+prettyPrint SpecialistNote{..} =
+    "Note " ++ specialistNoteId ++ ": \n" ++
+    "  function IPE:            " ++ show specialistNoteFunctionIpe ++ "\n" ++
+    "  location label and span: (" ++ show specialistNoteLocationLabel ++
+      ", " ++ show specialistNoteLocationSpan ++ ")\n" ++
+    "  dictionary ipes: \n" ++
+      unlines (map (("    " ++) . show) specialistNoteDictInfos)
 
 -- This should probably just be derived in GHC
 deriving instance Read InfoProv
 
 data DictInfo =
     DictInfo
-      { dictInfoProv :: Maybe InfoProv
-      , dictInfoFreeDicts :: [DictInfo]
+      { dictInfoType :: String
+      , dictInfoClosure :: DictClosure
+      }
+  deriving (Show, Read, Eq, Ord)
+
+data DictClosure =
+    DictClosure
+      { dictClosureProv :: Maybe InfoProv
+      , dictClosureFreeDicts :: [DictClosure]
       }
   deriving (Show, Read, Eq, Ord)
 
@@ -61,6 +77,7 @@ data SpecialistEnv =
       , specialistEnvInputSpecsFile :: !FilePath
       , specialistEnvSampleProb :: !Double
       , specialistEnvHscEnv :: !HscEnv
+      , specialistEnvCostCenters :: !Bool
       }
 
 data SpecialistState =

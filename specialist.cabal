@@ -1,26 +1,37 @@
 cabal-version:      3.4
 name:               specialist
 version:            0.1.0
-synopsis:
-  GHC plugin that detects and instruments overloaded function applications
-  to get information about them during runtime.
-license:            GPL-3.0-or-later
+synopsis:           GHC plugin that guides surgical specialization
+description:        This is a GHC plugin that finds and instruments overloaded
+                    calls in the source program. The instrumentation, when
+                    evaluated, prints data about the calls to the event log
+                    such as the provenance information of all dictionary
+                    arguments referenced in the call.
+license:            BSD-3-Clause
 license-file:       LICENSE
 author:             Finley McIlwaine
 maintainer:         finley@well-typed.com
-copyright:          (c) Well-Typed LLP 2023
 category:           GHC
 build-type:         Simple
+extra-source-files: README.md
 extra-doc-files:    CHANGELOG.md
 
 common common
-  ghc-options: -Wall -Wunused-packages
-  default-language: GHC2021
+  ghc-options:
+      -Wall
+      -Wunused-packages
+      -Wprepositive-qualified-module
+      -Widentities
+  default-language:
+      GHC2021
   default-extensions:
-    RecordWildCards
-    LambdaCase
+      RecordWildCards
+      LambdaCase
   build-depends:
-      base >=4.18.0.0 && < 5
+      -- specialist currently requires unmerged features of GHC
+      -- Use this 9.6 branch for compatibility:
+      -- https://gitlab.haskell.org/ghc/ghc/-/tree/wip/9.6-specialist-compat
+      base == 4.18.2.0
 
 library
   import: common
@@ -28,9 +39,7 @@ library
   exposed-modules:
       GHC.Specialist
       GHC.Specialist.Analysis
-      GHC.Specialist.Analysis.DumpSpecialisations
       GHC.Specialist.Analysis.EventLog
-      GHC.Specialist.Analysis.TextFile
       GHC.Specialist.Plugin
       GHC.Specialist.Plugin.Compat
       GHC.Specialist.Plugin.Initialization
@@ -39,7 +48,7 @@ library
       GHC.Specialist.Plugin.Orphans
       GHC.Specialist.Plugin.Types
   build-depends:
-      ghc
+    , ghc
     , ghc-events
     , ghc-heap
     , containers
@@ -58,16 +67,15 @@ executable specialyze
   main-is: Main.hs
   other-modules:
       Commands
-    , Commands.Common
-    , Commands.DictProvenance
-    , Commands.FindDuplicateSpecs
-    , Commands.GroupNotes
-    , Commands.ListNotes
-    , Commands.Pragmas
-    , Commands.ToSpeedscope
-    , Utils
+      Commands.DictProvenance
+      Commands.FindDuplicateSpecs
+      Commands.GroupNotes
+      Commands.ListNotes
+      Commands.Pragmas
+      Commands.ToSpeedscope
   build-depends:
-      specialist
+    , specialist
+
     , aeson
     , containers
     , dir-traverse
@@ -99,7 +107,7 @@ test-suite test-specialist
     , tasty
     , tasty-hunit
   build-tool-depends:
-      specialist:specialyze
+    , specialist:specialyze
     , specialist:test-T1
     , specialist:test-T2
     , specialist:test-T3
@@ -112,12 +120,12 @@ common test-exe
   build-depends:
       specialist
   ghc-options:
-    -fplugin=GHC.Specialist
-    -fplugin-opt=GHC.Specialist:f:1.0
-    -fplugin-opt=GHC.Specialist:vv
-    -finfo-table-map
-    -fdistinct-constructor-tables
-    -dcore-lint
+      -fplugin=GHC.Specialist
+      -fplugin-opt=GHC.Specialist:f:1.0
+      -fplugin-opt=GHC.Specialist:vv
+      -finfo-table-map
+      -fdistinct-constructor-tables
+      -dcore-lint
 
 executable test-T1
   import: test-exe
@@ -138,3 +146,10 @@ executable test-T4
   import: test-exe
   hs-source-dirs: test/unit-tests/T4
   main-is: Main.hs
+
+executable test-T5
+  import: test-exe
+  hs-source-dirs: test/unit-tests/T5
+  main-is: Main.hs
+  other-modules:
+    F1, F2, F3
