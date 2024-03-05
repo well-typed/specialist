@@ -1,6 +1,4 @@
--- |
--- Functions for extracting and analyzing specialist plugin output from a GHC
--- event log.
+-- | Functions for extracting specialist plugin output from a GHC event log.
 
 module GHC.Specialist.Analysis.EventLog where
 

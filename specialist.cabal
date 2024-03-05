@@ -40,6 +40,9 @@ library
       GHC.Specialist
       GHC.Specialist.Analysis
       GHC.Specialist.Analysis.EventLog
+      GHC.Specialist.Analysis.Rank
+      GHC.Specialist.Analysis.SpecChains
+      GHC.Specialist.Analysis.Speedscope
       GHC.Specialist.Plugin
       GHC.Specialist.Plugin.Compat
       GHC.Specialist.Plugin.Initialization
@@ -48,11 +51,14 @@ library
       GHC.Specialist.Plugin.Orphans
       GHC.Specialist.Plugin.Types
   build-depends:
+    , aeson
+    , containers
+    , directory
+    , filepath
     , ghc
     , ghc-events
     , ghc-heap
-    , containers
-    , directory
+    , hs-speedscope
     , mtl
     , random
     , text
@@ -70,19 +76,12 @@ executable specialyze
       Commands.DictProvenance
       Commands.FindDuplicateSpecs
       Commands.GroupNotes
-      Commands.ListNotes
-      Commands.Pragmas
-      Commands.ToSpeedscope
   build-depends:
     , specialist
 
-    , aeson
     , containers
     , dir-traverse
-    , filepath
     , ghc
-    , ghc-events
-    , hs-speedscope
     , optparse-applicative
     , text
 
@@ -122,7 +121,7 @@ common test-exe
   ghc-options:
       -fplugin=GHC.Specialist
       -fplugin-opt=GHC.Specialist:f:1.0
-      -fplugin-opt=GHC.Specialist:vv
+      -fplugin-opt=GHC.Specialist:v
       -finfo-table-map
       -fdistinct-constructor-tables
       -dcore-lint

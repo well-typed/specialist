@@ -114,8 +114,8 @@ readDumpSpecInfosToMap env dump_file = liftIO $ do
     else
       pure Map.empty
   where
-    go
+    _go
       :: DumpSpecInfo Text Text Text
       -> Map Text (DumpSpecInfo Text Text Text)
       -> Map Text (DumpSpecInfo Text Text Text)
-    go info@DumpSpecInfo{..} = Map.insert dumpSpecInfo_polyId info
+    _go info@DumpSpecInfo{..} = Map.insert dumpSpecInfo_polyId info

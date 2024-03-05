@@ -38,14 +38,23 @@ data SpecialistNote =
       }
   deriving (Show, Read, Eq, Ord)
 
-prettyPrint :: SpecialistNote -> String
-prettyPrint SpecialistNote{..} =
-    "Note " ++ specialistNoteId ++ ": \n" ++
-    "  function IPE:            " ++ show specialistNoteFunctionIpe ++ "\n" ++
-    "  location label and span: (" ++ show specialistNoteLocationLabel ++
-      ", " ++ show specialistNoteLocationSpan ++ ")\n" ++
-    "  dictionary ipes: \n" ++
-      unlines (map (("    " ++) . show) specialistNoteDictInfos)
+prettySpecialistNote :: SpecialistNote -> String
+prettySpecialistNote SpecialistNote{..} =
+    "Note " ++ specialistNoteId ++ ":\n  call to:\n"
+    ++
+    case specialistNoteFunctionIpe of
+      Just ipe ->
+        "    " ++ prettyInfoProv ipe ++ "\n"
+      Nothing ->
+        "    <unknown>\n"
+    ++
+    "  with dictionaries:\n"
+    ++
+    unlines (map (("    " ++) . prettyDictInfo) specialistNoteDictInfos)
+
+prettyInfoProv :: InfoProv -> String
+prettyInfoProv InfoProv{..} =
+    ipMod ++ "." ++ ipLabel ++ " (" ++ ipSrcFile ++ ":" ++ ipSrcSpan ++ ")"
 
 -- This should probably just be derived in GHC
 deriving instance Read InfoProv
@@ -57,12 +66,30 @@ data DictInfo =
       }
   deriving (Show, Read, Eq, Ord)
 
+prettyDictInfo :: DictInfo -> String
+prettyDictInfo (DictInfo t c) =
+    t ++
+      case dictClosureProv c of
+        Just ipe ->
+          " (" ++ prettyInfoProv ipe ++ ")"
+        Nothing ->
+          ""
+
 data DictClosure =
     DictClosure
       { dictClosureProv :: Maybe InfoProv
       , dictClosureFreeDicts :: [DictClosure]
       }
   deriving (Show, Read, Eq, Ord)
+
+dictClosureIpes :: DictClosure -> [InfoProv]
+dictClosureIpes (DictClosure mIpe frees) =
+    case mIpe of
+      Just ipe ->
+        (ipe :)
+      Nothing ->
+        id
+    $ concatMap dictClosureIpes frees
 
 data Dict (c :: Constraint) where
     Dict :: forall c. c => Dict c

@@ -1,3 +1,4 @@
+-- | This has likely been obsoleted by the SpecChains analysis
 module Commands.DictProvenance where
 
 import GHC.Specialist.Plugin.Types
@@ -26,7 +27,7 @@ dictProvenance notes =
       -> Map DictInfo (Set [String])
     updateProvs acc (d,SpecialistNote{..})
       | null specialistNoteCcs =
-          -- We have no call-stack data here, return
+          -- We have no call-stack data, return
           acc
       | otherwise =
           -- We have a non-empty call-stack. Make sure we include information
