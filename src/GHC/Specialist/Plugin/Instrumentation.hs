@@ -2,6 +2,8 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE ImpredicativeTypes  #-}
 {-# LANGUAGE MagicHash           #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Redundant <$>" #-}
 
 module GHC.Specialist.Plugin.Instrumentation where
 
@@ -9,8 +11,7 @@ import GHC.Specialist.Plugin.Types
 
 import Control.Concurrent
 import Control.Monad
-import Data.Set (Set)
-import Data.Set qualified as Set
+import Data.List
 import Debug.Trace
 import GHC.Exts
 import GHC.Exts.Heap
@@ -18,6 +19,7 @@ import GHC.InfoProv
 import GHC.IO
 import System.Random
 import Unsafe.Coerce
+import Data.Maybe
 
 -- | Put a dictionary in a box
 {-# NOINLINE dictToBox #-}
@@ -40,34 +42,92 @@ mkBox = dictToBox (Dict @a)
 -- through class functions. Therefore we accumulate the superclasses we have
 -- encountered as direct references from a closure in a set.
 getDictInfo :: (Box, String) -> IO DictInfo
-getDictInfo (Box dict, prettyType)=
-    Set.toList <$> go Set.empty dict >>= \case
-      [di] -> return (DictInfo prettyType di)
-      _ -> error "impossible: got more than one dict info for a single dict"
+getDictInfo (box@(Box dict), prettyType) = do
+    dc <-
+      getClosureData dict >>=
+        \case
+          ConstrClosure _ ptrs _ _ _ dcon_nm | 'C':':':cls_nm <- dcon_nm -> do
+            wf <- whereFrom dict
+
+            let
+              -- If the class name of this closure is found in ptr closures,
+              -- assume it is actually a class function, not a superclass
+              --
+              -- cls_nm will look like "C:Eq_Main_0_con_info" and we want to
+              -- filter out references to things like "$fEqX_$c==_info", so we
+              -- look for the "Eq"
+              filt InfoProv{..} = not $ takeWhile (/= '_') cls_nm `isInfixOf` ipName
+
+            frees <- catMaybes <$> mapM (go filt) ptrs
+            return $ DictClosure wf frees
+          FunClosure _ ptrs _ -> do
+            -- Assume this is a single method dictionary, which is actually just
+            -- the function
+            wf <- whereFrom dict
+            frees <- catMaybes <$> mapM (go (const True)) ptrs
+            return $ DictClosure wf frees
+          ThunkClosure _ ptrs _ -> do
+            -- TODO: For some reason, some dictionaries are showing up as
+            -- thunks. Forcing the dict gives errors for empty instances, which
+            -- came up in unit test T3.
+            wf <- whereFrom dict
+            frees <- catMaybes <$> mapM (go (const True)) ptrs
+            return $ DictClosure wf frees
+          closure ->
+            go (const True) box >>=
+              \case
+                Just dc ->
+                  return dc
+                Nothing -> do
+                  wf <- whereFrom dict
+                  return (DictClosureRaw wf (show closure))
+
+    return $ DictInfo prettyType dc
   where
-    go :: forall d. Set DictClosure -> d -> IO (Set DictClosure)
-    go acc d =
+    go :: (InfoProv -> Bool) -> Box -> IO (Maybe DictClosure)
+    go ipeFilt (Box d) =
       getClosureData d >>=
         \case
-          ConstrClosure _ ptrs _ _ _ dcon_nm | 'C':':':_ <- dcon_nm -> do
+          ConstrClosure _ ptrs _ _ _ dcon_nm | 'C':':':cls_nm <- dcon_nm -> do
             wf <- whereFrom d
 
-            -- We reset the accumulator to the empty set here, since we no
-            -- longer wish to avoid adding duplicate superclasses (we may
-            -- encounter the same dictionary along a different path of
-            -- superclasses)
-            frees <- foldM (\scs (Box fd) -> go scs fd) Set.empty ptrs
+            let
+              -- If the class name of this closure is found in ptr closures,
+              -- assume it is actually a class function, not a superclass
+              --
+              -- cls_nm will look like "C:Eq_Main_0_con_info" and we want to
+              -- filter out references to things like "$fEqX_$c==_info", so we
+              -- look for the "Eq"
+              filt InfoProv{..} = not $ takeWhile (/= '_') cls_nm `isInfixOf` ipName
 
-            return (Set.insert (DictClosure wf (Set.toList frees)) acc)
+            frees <- catMaybes <$> mapM (go filt) ptrs
+            return $ Just (DictClosure wf frees)
           FunClosure _ ptrs _ -> do
-            -- Use the same accumulator here, we do not consider references
-            -- through class functions as distinct
-            foldM (\scs (Box fd) -> go scs fd) acc ptrs
-          ThunkClosure _ ptrs _ -> do
-            -- Use the same accumulator here, we do not consider references
-            -- through thunks as distinct
-            foldM (\scs (Box fd) -> go scs fd) acc ptrs
-          _ -> return Set.empty
+            -- Assume this is a single method dictionary, which is actually just
+            -- the function
+            --
+            -- If the filter is "False", then we assume this is a function
+            -- referenced by a record dictionary, so we don't want to keep it
+            wf <- whereFrom d
+            if maybe True ipeFilt wf then do
+              frees <- catMaybes <$> mapM (go (const True)) ptrs
+              return $ Just (DictClosure wf frees)
+            else do
+              return Nothing
+          IndClosure _ ptr -> do
+            -- Go straight through indirections
+            --
+            -- I believe this can happen if a dictionary is given a cost center
+            -- with -fprof-late, e.g.
+            go ipeFilt ptr
+          PAPClosure _ _ _ _ptrs _ -> do
+            -- TODO: For some reason, some dictionaries were showing up as
+            -- PAPs... no idea why. This was happening before I added the thunk
+            -- closures back and stopped forcing the dict to WHNF, maybe they
+            -- were resulting from forced dicts?
+            return Nothing
+          _c -> do
+            return Nothing
 
 {-# NOINLINE specialistWrapper' #-}
 specialistWrapper' :: forall a r (b :: TYPE r).

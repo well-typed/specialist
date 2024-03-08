@@ -11,6 +11,7 @@ import GHC.Specialist.Plugin.Types
 
 import Control.Monad.State.Strict
 import Control.Monad.Reader
+import Data.List
 import Data.Maybe
 import Data.Set qualified as Set
 import GHC.Core
@@ -113,9 +114,11 @@ processExpr = \case
            -- Check if any of the arguments are dictionaries
            any isDictExpr args
 
-           -- Attempt to avoid instrumenting dictionary functions, which may be
-           -- overloaded if there are superclasses, by checking if the result
-           -- type of the function is a dictionary type.
+           -- Avoid instrumenting dfuns, which may appear overloaded if they
+           -- come from a single method type class with superclasses
+        && maybe True (not . ("$f" `isPrefixOf`)) (exprOccNameString f)
+
+           -- TODO: Is this necessary given above check?
         && not (isDictTy resultTy)
 
            -- Avoid instrumenting constraint selectors like eq_sel (See
@@ -190,6 +193,8 @@ processExpr = \case
 
         slogVV "Application function:"
         slogVV f
+        slogVV "Application function type:"
+        slogVV (exprType f)
         slogVV "Application type args:"
         slogVV tyArgs
         slogVV "Application value args:"
@@ -376,8 +381,13 @@ trackSourceNote = \case
 -------------------------------------------------------------------------------
 
 isDictExpr :: CoreExpr -> Bool
-isDictExpr =
-    maybe False isDictTy . exprType'
+isDictExpr e =
+    case exprType' e of
+      Just t ->
+        -- Do not treat implicit parameters like dictionaries!
+        not (isIPLikePred t) && isDictTy t
+      Nothing ->
+        False
   where
     exprType' :: CoreExpr -> Maybe Type
     exprType' = \case
@@ -388,16 +398,29 @@ isJoinVarExpr :: CoreExpr -> Bool
 isJoinVarExpr =
     \case
       Var var -> isJoinId var
+      Tick _ e -> isJoinVarExpr e
+      Cast e _ -> isJoinVarExpr e
       _ -> False
 
+exprOccNameString :: CoreExpr -> Maybe String
+exprOccNameString = fmap (occNameString . occName . idName) . exprId
+
+exprOccName :: CoreExpr -> Maybe OccName
+exprOccName = fmap (occName . idName) . exprId
+
 exprName :: CoreExpr -> Maybe Name
-exprName =
+exprName = fmap idName . exprId
+
+exprId :: CoreExpr -> Maybe Id
+exprId =
     \case
       App f _ ->
-        exprName f
+        exprId f
       Var f ->
-        Just (idName f)
+        Just f
       Tick _ e ->
-        exprName e
+        exprId e
+      Cast e _ ->
+        exprId e
       _ ->
         Nothing

@@ -12,14 +12,22 @@ module Main where
 --
 -- So the Eq instance should show up as a free dictionary of both the Ord and C1
 -- dictionaries.
+--
+-- We also have a single-method type class without superclasses to test the fact
+-- that those are simply represented as the functions themselves, not records.
+-- But TODO to actually add an automated check that it shows up properly.
 
 data X = X1 | X2
   deriving (Show, Read, Eq, Ord)
 
 class Eq a => C1 a where
   lt :: a -> a -> Bool
+
 class (Ord a, C1 a) => C2 a where
   gt :: a -> a -> Bool
+
+class C3 a where
+  c3 :: a -> a -> a -> Bool
 
 instance C1 X where
   {-# NOINLINE lt #-}
@@ -28,9 +36,13 @@ instance C2 X where
   {-# NOINLINE gt #-}
   gt x1 x2 = x1 `lt` x2 && x1 > x2
 
+instance C3 X where
+  {-# NOINLINE c3 #-}
+  c3 x1 x2 x3 = x1 `lt` x2 || x1 > x2 && x2 > x3
+
 {-# NOINLINE doSomething #-}
-doSomething :: C2 a => a -> a -> Bool
-doSomething = gt
+doSomething :: (C3 a, C2 a) => a -> a -> Bool
+doSomething x y = gt x y || c3 x y x
 
 main :: IO ()
 main = do

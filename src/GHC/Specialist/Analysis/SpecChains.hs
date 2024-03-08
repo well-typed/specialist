@@ -184,13 +184,12 @@ prettySpecChainMap =
     pretty :: ([String], (Integer, Set String)) -> String -> String
     pretty (chain, (count, ds)) acc =
         unlines
-          ( "matching dictionaries: "
-            : map ("    " ++) (Set.toList ds)
+          ( "* call chain:"
+              : map ("    " ++) chain
               ++
-              [ "  included in " ++ show count ++ " total calls through chain:"
+              ["  involving " ++ show count ++ " total calls with dictionaries:"]
+              ++
+              map ("    " ++) (Set.toList ds)
 
-              ]
-              ++
-              map ("    " ++) chain
           ) ++
             acc

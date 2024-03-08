@@ -47,12 +47,12 @@ testT1 notes = testCase "T1" $ do
         _ ->
           assertFailure "expect one dictionary in the call that includes the ShowList dictionary constructor"
     showXDict <-
-      case dictClosureFreeDicts showListDict of
+      case dictClosureFrees showListDict of
         [d] ->
           return d
         _ ->
           assertFailure "expect exactly one superclass referenced in the call including the $fShowList dictionary"
-    case dictClosureProv showXDict of
+    case dictClosureIpe showXDict of
       Just InfoProv{..} ->
         "$fShowX" == ipLabel @?
           "expect the $fShowX dictionary to be the superclass referenced by the $fShowList constructor"

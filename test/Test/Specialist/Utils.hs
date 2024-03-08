@@ -31,12 +31,12 @@ includesDictName s SpecialistNote{..} =
 -- | Checks whether the IPE label of the 'DictClosure' contains the given string.
 dictIncludesDictLabel :: String -> DictClosure -> Bool
 dictIncludesDictLabel s =
-    maybe False ((s `isInfixOf`) . ipLabel) . dictClosureProv
+    maybe False ((s `isInfixOf`) . ipLabel) . dictClosureIpe
 
 -- | Checks whether the IPE name of the 'DictClosure' contains the given string.
 dictIncludesDictName :: String -> DictClosure -> Bool
 dictIncludesDictName s =
-    maybe False ((s `isInfixOf`) . ipName) . dictClosureProv
+    maybe False ((s `isInfixOf`) . ipName) . dictClosureIpe
 
 -- | Check that the dictionaries referenced in the note abide by some basic
 -- superclass relationships
@@ -84,11 +84,11 @@ checkDictSuperclassesWith
   -> DictClosure
   -- ^ 'DictClosure' to check
   -> Assertion
-checkDictSuperclassesWith rs di@DictClosure{..} = do
+checkDictSuperclassesWith rs dc = do
     mapM_ checkGivenRel rs
-    mapM_ (checkDictSuperclassesWith rs) dictClosureFreeDicts
+    mapM_ (checkDictSuperclassesWith rs) (dictClosureFrees dc)
   where
     checkGivenRel (c, sc) =
-      when (dictIncludesDictName c di) $
-        any (dictIncludesDictName sc) dictClosureFreeDicts @?
+      when (dictIncludesDictName c dc) $
+        any (dictIncludesDictName sc) (dictClosureFrees dc) @?
           "expect " ++ sc ++ " to be a superclass of " ++ c

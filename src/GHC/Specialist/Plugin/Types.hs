@@ -10,6 +10,7 @@ import Control.Monad.Reader
 import Control.Monad.State.Strict
 import Data.Kind
 import Data.Map (Map)
+import Data.Maybe
 import Data.Set (Set)
 import Data.Text (Text)
 import Data.Word
@@ -53,34 +54,49 @@ prettySpecialistNote SpecialistNote{..} =
     unlines (map (("    " ++) . prettyDictInfo) specialistNoteDictInfos)
 
 prettyInfoProv :: InfoProv -> String
-prettyInfoProv InfoProv{..} =
-    ipMod ++ "." ++ ipLabel ++ " (" ++ ipSrcFile ++ ":" ++ ipSrcSpan ++ ")"
+prettyInfoProv ipe  =
+    prettyInfoProvModLabel ipe ++ " (" ++ prettyInfoProvFileSpan ipe ++ ")"
+
+prettyInfoProvModLabel :: InfoProv -> String
+prettyInfoProvModLabel InfoProv{..} = ipMod ++ "." ++ ipLabel
+
+prettyInfoProvFileSpan :: InfoProv -> String
+prettyInfoProvFileSpan InfoProv{..} = ipSrcFile ++ ":" ++ ipSrcSpan
 
 -- This should probably just be derived in GHC
 deriving instance Read InfoProv
 
 data DictInfo =
-    DictInfo
-      { dictInfoType :: String
-      , dictInfoClosure :: DictClosure
-      }
+      DictInfo
+        { dictInfoType :: String
+        , dictInfoClosure :: DictClosure
+        }
   deriving (Show, Read, Eq, Ord)
 
 prettyDictInfo :: DictInfo -> String
 prettyDictInfo (DictInfo t c) =
-    t ++
-      case dictClosureProv c of
-        Just ipe ->
-          " (" ++ prettyInfoProv ipe ++ ")"
-        Nothing ->
-          ""
+    maybe "<no IPE data>" prettyInfoProv (dictClosureIpe c)
+    ++
+    " (" ++ t ++ ")"
 
 data DictClosure =
-    DictClosure
-      { dictClosureProv :: Maybe InfoProv
-      , dictClosureFreeDicts :: [DictClosure]
-      }
+      DictClosure (Maybe InfoProv) [DictClosure]
+    | DictClosureRaw
+        (Maybe InfoProv)
+        -- | Shown 'GHC.Heap.Exts.Closure'
+        String
+
   deriving (Show, Read, Eq, Ord)
+
+dictClosureIpe :: DictClosure -> Maybe InfoProv
+dictClosureIpe =
+    \case
+      DictClosure ipe    _ -> ipe
+      DictClosureRaw ipe _ -> ipe
+
+dictClosureFrees :: DictClosure -> [DictClosure]
+dictClosureFrees (DictClosure _ frees) = frees
+dictClosureFrees (DictClosureRaw _ _) = []
 
 dictClosureIpes :: DictClosure -> [InfoProv]
 dictClosureIpes (DictClosure mIpe frees) =
@@ -90,6 +106,8 @@ dictClosureIpes (DictClosure mIpe frees) =
       Nothing ->
         id
     $ concatMap dictClosureIpes frees
+dictClosureIpes (DictClosureRaw mIpe _) =
+    maybeToList mIpe
 
 data Dict (c :: Constraint) where
     Dict :: forall c. c => Dict c

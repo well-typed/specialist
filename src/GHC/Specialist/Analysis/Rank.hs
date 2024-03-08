@@ -61,9 +61,9 @@ prettyRankMap =
     pretty :: ((InfoProv, [DictInfo]), Integer) -> String -> String
     pretty ((ip, dictInfos), count) acc =
         unlines
-          ( [ prettyInfoProv ip
-            , "  called " ++ show count ++ " times with dictionaries: "
+          ( [ "* " ++ prettyInfoProv ip
+            , "    called " ++ show count ++ " times with dictionaries: "
             ] ++
-              map (("    " ++) . prettyDictInfo) dictInfos
+              map (("      " ++) . prettyDictInfo) dictInfos
           ) ++
             acc

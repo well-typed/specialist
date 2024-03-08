@@ -23,10 +23,7 @@ import Options.Applicative
 --    analysis, e.g. finding duplicate specializations.
 data SpecialyzeCommand =
       NotesCommand !FilePath !NotesCommand
-
-    | -- | Find duplicate specializations in some GHC dump output (requires
-      -- https://gitlab.haskell.org/ghc/ghc/-/merge_requests/11358)
-      FindDuplicateSpecsCommand FindDuplicateSpecsOptions
+    | AuxCommand !AuxCommand
   deriving (Show, Read, Eq)
 
 data NotesCommand =
@@ -70,17 +67,27 @@ data NotesCommand =
         (Maybe String)
   deriving (Show, Read, Eq)
 
+data AuxCommand =
+      -- | Find duplicate specializations in some GHC dump output (requires
+      -- https://gitlab.haskell.org/ghc/ghc/-/merge_requests/11358)
+      FindDuplicateSpecsCommand !FindDuplicateSpecsOptions
+  deriving (Show, Read, Eq)
+
+
 -- | Top-level command parser
 specialyzeCommand :: Parser SpecialyzeCommand
 specialyzeCommand =
-        subparser (command "notes" infoNotes)
-    <|> auxCommands
+    (     NotesCommand
+      <$> notesInput
+      <*> notesCommand
+    )
+    <|> subparser (command "aux" infoAux <> metavar "aux")
   where
-    infoNotes :: ParserInfo SpecialyzeCommand
-    infoNotes =
+    infoAux :: ParserInfo SpecialyzeCommand
+    infoAux =
         info
-          (NotesCommand <$> notesInput <*> notesCommand <**> helper)
-          (progDesc "Analyze specialist notes from an event log")
+          (AuxCommand <$> auxCommands <**> helper)
+          (progDesc "Auxiliary commands")
 
     notesInput :: Parser FilePath
     notesInput =
@@ -94,14 +101,14 @@ specialyzeCommand =
                   )
           )
 
--- | @notes@ command parser
+-- | Notes command parser
 notesCommand :: Parser NotesCommand
 notesCommand =
     subparser
       (    command "list"            infoListNotes
         <> command "rank"            infoRank
         <> command "spec-chains"     infoSpecChains
-        <> command "group-notes"     infoGroupNotes
+        <> command "group"     infoGroupNotes
         <> command "dict-provenance" infoDictProvenance
         <> command "speedscope"      infoSpeedscope
       )
@@ -241,13 +248,13 @@ notesCommand =
         )
 
 -- | Auxiliary command parser
-auxCommands :: Parser SpecialyzeCommand
+auxCommands :: Parser AuxCommand
 auxCommands =
     subparser
       ( command "find-duplicate-specializations" infoFindDuplicateSpecializations
       )
   where
-    infoFindDuplicateSpecializations :: ParserInfo SpecialyzeCommand
+    infoFindDuplicateSpecializations :: ParserInfo AuxCommand
     infoFindDuplicateSpecializations =
       info
         (FindDuplicateSpecsCommand <$> findDuplicateSpecsOptions)
@@ -291,5 +298,5 @@ interpretSpecialyzeCommand =
                 putStrLn $
                   prettySpecChainMap $
                     specChains mDictFilt mCCFilt notes
-      FindDuplicateSpecsCommand opts ->
+      AuxCommand (FindDuplicateSpecsCommand opts) ->
         findDuplicateSpecializations opts

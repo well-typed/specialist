@@ -121,7 +121,7 @@ common test-exe
   ghc-options:
       -fplugin=GHC.Specialist
       -fplugin-opt=GHC.Specialist:f:1.0
-      -fplugin-opt=GHC.Specialist:v
+      -fplugin-opt=GHC.Specialist:vv
       -finfo-table-map
       -fdistinct-constructor-tables
       -dcore-lint
@@ -150,5 +150,9 @@ executable test-T5
   import: test-exe
   hs-source-dirs: test/unit-tests/T5
   main-is: Main.hs
-  other-modules:
-    F1, F2, F3
+
+executable test-T6
+  import: test-exe
+  hs-source-dirs: test/unit-tests/T6
+  main-is: Main.hs
+  other-modules: A, Class

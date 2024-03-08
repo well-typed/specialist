@@ -65,10 +65,10 @@ processEvents mDictLoc elProf (Event _t ei _c) =
       _ ->
         elProf
   where
-    dictClosureContainsLoc loc (DictClosure mIpe frees) =
-        case mIpe of
+    dictClosureContainsLoc loc dc =
+        case dictClosureIpe dc of
           Just ipe ->
             loc `isInfixOf` prettyInfoProv ipe
           Nothing ->
             False
-        || any (dictClosureContainsLoc loc) frees
+        || any (dictClosureContainsLoc loc) (dictClosureFrees dc)
