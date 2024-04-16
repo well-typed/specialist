@@ -134,6 +134,7 @@ data SpecialistState =
       , specialistStateUniqSupply :: UniqSupply
       , specialistStateInputSpecs :: !(Map Text (DumpSpecInfo Text Text Text))
       , specialistStateOverloadedCallCount :: !Integer
+      , specialistStateIORefBinds :: [CoreBind]
       }
 
 data Verbosity = Silent | Verbose | VeryVerbose

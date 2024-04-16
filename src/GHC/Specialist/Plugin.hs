@@ -11,6 +11,7 @@ import GHC.Specialist.Plugin.Types
 
 import Control.Monad.State.Strict
 import Control.Monad.Reader
+import Data.IORef (newIORef)
 import Data.List
 import Data.Maybe
 import Data.Set qualified as Set
@@ -20,8 +21,10 @@ import GHC.Core.TyCo.Rep (Scaled (..))
 import GHC.Plugins
 import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
+import GHC.Types.Name.Occurrence qualified as Occurrence
 import GHC.Types.Tickish
 import GHC.Types.TyThing
+import System.IO.Unsafe (unsafePerformIO)
 
 -------------------------------------------------------------------------------
 -- Plugin definition and installation
@@ -63,7 +66,7 @@ specialist (cgs@CgGuts{..}, _) = do
 
     return
       ( cgs
-          { cg_binds = cg_binds'
+          { cg_binds = cg_binds' ++ specialistStateIORefBinds
           , cg_ccs = Set.toList specialistStateLocalCcs ++ cg_ccs
           }
       , specialistStateCostCentreState
@@ -202,6 +205,14 @@ processExpr = \case
         slogVV "Application result type:"
         slogVV resultTy
 
+        -- What is the current module?
+        curMod <-
+          gets specialistStateCurrentModule >>= \case
+            Just m ->
+              return m
+            Nothing ->
+              error "Specialist plugin could not determine current module"
+
         -- Get the wrapper function
         wrapperId <- do
           mName <- liftIO $ thNameToGhcNameIO name_cache 'specialistWrapper
@@ -234,7 +245,72 @@ processExpr = \case
                 return ("", "")
 
         uniqId <- show <$> getUniqueM
+
         sampleProb <- asks specialistEnvSampleProb
+
+        -- Create the IORef that will inidicate whether this overloaded call has
+        -- been sampled
+        -- Get the Box type
+        iorefBoolType <- do
+          mName <- liftIO $ thNameToGhcNameIO name_cache 'iorefBoolTypeDUMMY
+          case mName of
+            Just n -> exprType . Var <$> lookupId n
+            Nothing -> error "Specialist plugin failed to obtain the IORef Bool type"
+        iorefUniq <- getUniqueM
+        let
+          iorefName =
+            mkExternalName
+              iorefUniq
+              curMod
+              (mkOccName Occurrence.varName ("_sampled_" ++ uniqId))
+              (UnhelpfulSpan UnhelpfulGenerated)
+          iorefId =
+            globaliseId $
+            mkLocalVar
+              VanillaId
+              iorefName
+              OneTy
+              iorefBoolType
+              ( setInlinePragInfo
+                  vanillaIdInfo
+                  neverInlinePragma
+              )
+
+        unsafePerformIOVar <- do
+          mName <- liftIO $ thNameToGhcNameIO name_cache 'unsafePerformIO
+          case mName of
+            Just n -> Var <$> lookupId n
+            Nothing -> error "Specialist plugin failed to obtain the unsafePerformIO name"
+        newIORefVar <- do
+          mName <- liftIO $ thNameToGhcNameIO name_cache 'newIORef
+          case mName of
+            Just n -> Var <$> lookupId n
+            Nothing -> error "Specialist plugin failed to obtain the newIORef name"
+        boolType <- do
+          mName <- liftIO $ thNameToGhcNameIO name_cache 'boolTypeDUMMY
+          case mName of
+            Just n -> exprType . Var <$> lookupId n
+            Nothing -> error "Specialist plugin failed to obtain the Bool type"
+        let ioRefBind =
+              NonRec
+                iorefId
+                ( mkApps
+                    unsafePerformIOVar
+                    [ Type iorefBoolType
+                    , mkApps
+                        newIORefVar
+                        [ Type boolType
+                        , Var falseDataConId
+                        ]
+                    ]
+                )
+
+        modify'
+          ( \s@SpecialistState{..} ->
+              s { specialistStateIORefBinds =
+                    ioRefBind : specialistStateIORefBinds
+                }
+          )
 
         dictTyPairs <-
           mapM
@@ -262,6 +338,7 @@ processExpr = \case
               , Type $ getRuntimeRep tb
               , Type tb
               , sampleProbExpr
+              , Var iorefId
               , fIdStr
               , lStr
               , ssStr
@@ -277,23 +354,14 @@ processExpr = \case
 
         ccWrap <-
           if insertCCs then do
-            -- What is the current module?
-            curMod <-
-              gets specialistStateCurrentModule >>= \case
-                Just m ->
-                  return m
-                Nothing ->
-                  error "Specialist plugin could not determine current module"
-
             -- Extract a name and source location from the function being applied
             let
               !f_name_maybe = exprName app
               f_srcspan_maybe = nameSrcSpan <$> f_name_maybe
               cc_id_fs =
                 fsLit $
-                  "<OVERLOADED call to function: " ++
                   maybe "(no name available)" getOccString f_name_maybe ++
-                  "> call id " ++ uniqId
+                  " (call id " ++ uniqId ++ ")"
 
             -- Cost centre index
             -- Note: This should always be zero, since we include the unique call

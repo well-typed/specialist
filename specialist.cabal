@@ -121,7 +121,7 @@ common test-exe
   ghc-options:
       -fplugin=GHC.Specialist
       -fplugin-opt=GHC.Specialist:f:1.0
-      -fplugin-opt=GHC.Specialist:vv
+      -fplugin-opt=GHC.Specialist:v
       -finfo-table-map
       -fdistinct-constructor-tables
       -dcore-lint

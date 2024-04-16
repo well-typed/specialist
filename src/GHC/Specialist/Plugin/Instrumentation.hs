@@ -16,6 +16,7 @@ import Debug.Trace
 import GHC.Exts
 import GHC.Exts.Heap
 import GHC.InfoProv
+import GHC.IORef
 import GHC.IO
 import System.Random
 import Unsafe.Coerce
@@ -68,8 +69,7 @@ getDictInfo (box@(Box dict), prettyType) = do
             return $ DictClosure wf frees
           ThunkClosure _ ptrs _ -> do
             -- TODO: For some reason, some dictionaries are showing up as
-            -- thunks. Forcing the dict gives errors for empty instances, which
-            -- came up in unit test T3.
+            -- thunks. If we force them, I think some will show up as PAPs?
             wf <- whereFrom dict
             frees <- catMaybes <$> mapM (go (const True)) ptrs
             return $ DictClosure wf frees
@@ -132,16 +132,18 @@ getDictInfo (box@(Box dict), prettyType) = do
 {-# NOINLINE specialistWrapper' #-}
 specialistWrapper' :: forall a r (b :: TYPE r).
      Double
+  -> IORef Bool
   -> Addr#
   -> Addr#
   -> Addr#
   -> (a -> b)
   -> [(Box, String)]
   -> ()
-specialistWrapper' sampleProb fIdAddr lAddr ssAddr f boxedDicts =
+specialistWrapper' sampleProb hasSampledRef fIdAddr lAddr ssAddr f boxedDicts =
     unsafePerformIO $ do
       coin <- (< sampleProb) <$> randomRIO @Double (0.0, 1.0)
-      when coin $
+      sampled <- atomicModifyIORef' hasSampledRef (True,)
+      when (coin || not sampled) $
         traceEventIO . show =<<
           SpecialistNote (unpackCString# fIdAddr)
             <$> currentCallStack
@@ -155,6 +157,9 @@ specialistWrapper' sampleProb fIdAddr lAddr ssAddr f boxedDicts =
 specialistWrapper :: forall a r (b :: TYPE r).
      Double
   -- ^ Sample probability
+  -> IORef Bool
+  -- ^ 'IORef' holding a 'Bool' indicating whether a sample has been emitted for
+  -- this overloaded call yet.
   -> Addr#
   -- ^ Unique identifier for this overloaded call site
   -> Addr#
@@ -172,3 +177,10 @@ specialistWrapper = unsafeCoerce specialistWrapper'
 -- | Just here to call @exprType@ on
 boxTypeDUMMY :: Box
 boxTypeDUMMY = error "I'm just here to be a Type, do not evaluate"
+
+-- | Just here to call @exprType@ on
+iorefBoolTypeDUMMY :: IORef Bool
+iorefBoolTypeDUMMY = error "I'm just here to be a Type, do not evaluate"
+
+boolTypeDUMMY :: Bool
+boolTypeDUMMY = error "I'm just here to be a Type, do not evaluate"
