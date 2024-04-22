@@ -360,8 +360,7 @@ processExpr = \case
               f_srcspan_maybe = nameSrcSpan <$> f_name_maybe
               cc_id_fs =
                 fsLit $
-                  maybe "(no name available)" getOccString f_name_maybe ++
-                  " (call id " ++ uniqId ++ ")"
+                  maybe "(no name available)" getOccString f_name_maybe
 
             -- Cost centre index
             -- Note: This should always be zero, since we include the unique call

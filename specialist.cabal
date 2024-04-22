@@ -155,4 +155,4 @@ executable test-T6
   import: test-exe
   hs-source-dirs: test/unit-tests/T6
   main-is: Main.hs
-  other-modules: A, Class
+  other-modules: Class

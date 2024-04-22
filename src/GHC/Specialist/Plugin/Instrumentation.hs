@@ -117,8 +117,8 @@ getDictInfo (box@(Box dict), prettyType) = do
           IndClosure _ ptr -> do
             -- Go straight through indirections
             --
-            -- I believe this can happen if a dictionary is given a cost center
-            -- with -fprof-late, e.g.
+            -- I believe this can happen if, e.g., a dictionary is given a cost
+            -- center with -fprof-late.
             go ipeFilt ptr
           PAPClosure _ _ _ _ptrs _ -> do
             -- TODO: For some reason, some dictionaries were showing up as
@@ -126,6 +126,23 @@ getDictInfo (box@(Box dict), prettyType) = do
             -- closures back and stopped forcing the dict to WHNF, maybe they
             -- were resulting from forced dicts?
             return Nothing
+          BlackholeClosure _ ind -> do
+            -- Blackholes can be updated to point to indirections, if things are
+            -- timed just right. See Note [BLACKHOLE pointing to IND] in GHC.
+            ind_cd <- getClosureData ind
+            case ind_cd of
+              IndClosure _ ptr ->
+                go ipeFilt ptr
+              _ ->
+                -- TODO: When the plugin is enabled on the Cabal-syntax library,
+                -- and we run the cabal hackage-test parsec test, we see many
+                -- dictionaries come through as BlackholeClosures. It's unclear
+                -- what exactly is resulting in this, but as a first-try
+                -- workaround I added this retry loop (instead of `return
+                -- Nothing`) and it fixed it. Definitely worth keeping in mind,
+                -- in case this ends up biting us later.
+                let !d' = d in go ipeFilt (Box d')
+                -- return Nothing
           _c -> do
             return Nothing
 

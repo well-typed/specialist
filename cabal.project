@@ -3,15 +3,6 @@ packages: .
 allow-newer:
   ghc-events:base
 
-tests: True
-
-package *
-  ghc-options:
-    -fexpose-all-unfoldings
-    -fspecialise-aggressively
-    -finfo-table-map
-    -fdistinct-constructor-tables
-
 source-repository-package
   type: git
   location: https://github.com/FinleyMcIlwaine/hs-speedscope
