@@ -7,7 +7,7 @@ import GHC.Specialist.Analysis.SpecChains
 import GHC.Specialist.Analysis.Speedscope
 
 import Commands.DictProvenance
-import Commands.FindDuplicateSpecs
+-- import Commands.FindDuplicateSpecs
 import Commands.GroupNotes
 
 import Options.Applicative
@@ -23,7 +23,7 @@ import Options.Applicative
 --    analysis, e.g. finding duplicate specializations.
 data SpecialyzeCommand =
       NotesCommand !FilePath !NotesCommand
-    | AuxCommand !AuxCommand
+    -- | AuxCommand !AuxCommand
   deriving (Show, Read, Eq)
 
 data NotesCommand =
@@ -67,11 +67,12 @@ data NotesCommand =
         (Maybe String)
   deriving (Show, Read, Eq)
 
-data AuxCommand =
-      -- | Find duplicate specializations in some GHC dump output (requires
-      -- https://gitlab.haskell.org/ghc/ghc/-/merge_requests/11358)
-      FindDuplicateSpecsCommand !FindDuplicateSpecsOptions
-  deriving (Show, Read, Eq)
+-- TODO: Remove or uncomment after below MR is merged or further implemented.
+-- data AuxCommand =
+--       -- | Find duplicate specializations in some GHC dump output (requires
+--       -- https://gitlab.haskell.org/ghc/ghc/-/merge_requests/11358)
+--       FindDuplicateSpecsCommand !FindDuplicateSpecsOptions
+--   deriving (Show, Read, Eq)
 
 
 -- | Top-level command parser
@@ -81,13 +82,13 @@ specialyzeCommand =
       <$> notesInput
       <*> notesCommand
     )
-    <|> subparser (command "aux" infoAux <> metavar "aux")
+    -- <|> subparser (command "aux" infoAux <> metavar "aux")
   where
-    infoAux :: ParserInfo SpecialyzeCommand
-    infoAux =
-        info
-          (AuxCommand <$> auxCommands <**> helper)
-          (progDesc "Auxiliary commands")
+    -- infoAux :: ParserInfo SpecialyzeCommand
+    -- infoAux =
+    --     info
+    --       (AuxCommand <$> auxCommands <**> helper)
+    --       (progDesc "Auxiliary commands")
 
     notesInput :: Parser FilePath
     notesInput =
@@ -248,6 +249,7 @@ notesCommand =
         )
 
 -- | Auxiliary command parser
+{-
 auxCommands :: Parser AuxCommand
 auxCommands =
     subparser
@@ -262,6 +264,7 @@ auxCommands =
             "Find specialisations of the same overloaded function at the " ++
             "same type originating from different modules"
         )
+-}
 
 -------------------------------------------------------------------------------
 -- Interpreting commands
@@ -298,5 +301,5 @@ interpretSpecialyzeCommand =
                 putStrLn $
                   prettySpecChainMap $
                     specChains mDictFilt mCCFilt notes
-      AuxCommand (FindDuplicateSpecsCommand opts) ->
-        findDuplicateSpecializations opts
+      -- AuxCommand (FindDuplicateSpecsCommand opts) ->
+      --   findDuplicateSpecializations opts

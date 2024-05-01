@@ -1,3 +1,4 @@
+-- | TODO: Remove or uncomment if merged in GHC
 module Commands.FindDuplicateSpecs where
 
 import GHC.Specialist.Plugin.Orphans ()
@@ -8,13 +9,13 @@ import Data.Map (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe
 import Data.Text (Text)
-import GHC.Types.DumpSpecInfo
+-- Not merged in GHC
+-- import GHC.Types.DumpSpecInfo
 import Options.Applicative
 import System.Directory.Recursive
 import Text.Read
 
-
-
+{-
 data FindDuplicateSpecsOptions =
     FindDuplicateSpecsOptions
       FilePath
@@ -90,3 +91,4 @@ readDumpSpecInfosFromFile
   -> IO [DumpSpecInfo a b c]
 readDumpSpecInfosFromFile =
     pure . mapMaybe readMaybe . lines <=< readFile
+-}

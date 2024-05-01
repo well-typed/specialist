@@ -22,9 +22,13 @@ data X = X1 | X2
 
 class Eq a => C1 a where
   lt :: a -> a -> Bool
+  dc1 :: a -> ()
+  dc1 _ = ()
 
 class (Ord a, C1 a) => C2 a where
   gt :: a -> a -> Bool
+  dc2 :: a -> ()
+  dc2 _ = ()
 
 class C3 a where
   c3 :: a -> a -> a -> Bool
@@ -32,6 +36,7 @@ class C3 a where
 instance C1 X where
   {-# NOINLINE lt #-}
   lt = (<)
+
 instance C2 X where
   {-# NOINLINE gt #-}
   gt x1 x2 = x1 `lt` x2 && x1 > x2

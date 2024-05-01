@@ -7,7 +7,7 @@ import Control.Exception
 
 main :: IO ()
 main = do
-  f 100 `catch` \(SomeException _) -> print True
+  f @Integer 100 `catch` \(SomeException _) -> print True
 
 {-# NOINLINE f #-}
 f :: (HasCallStack, Show a) => a -> IO ()

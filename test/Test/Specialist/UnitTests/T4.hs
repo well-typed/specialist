@@ -25,8 +25,8 @@ getNotesT4 = do
 
 testT4 :: [SpecialistNote] -> TestTree
 testT4 notes = testCase "T4" $ do
-    length notes == 1 @?
-      "expect exactly seven overloaded calls"
+    length notes == 2 @?
+      "expect exactly two overloaded calls"
     mapM_
       ( checkSuperclasses
           [ ("C:C2", "C:Ord")

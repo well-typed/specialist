@@ -13,7 +13,8 @@ import Data.Set qualified as Set
 import Data.Text (Text)
 import GHC.Plugins
 import GHC.Types.CostCentre.State
-import GHC.Types.DumpSpecInfo
+-- Unimplemented DumpSpecInfo tracking
+-- import GHC.Types.DumpSpecInfo
 import GHC.Utils.Logger
 import System.Directory
 import Text.Read (readMaybe)
@@ -23,8 +24,8 @@ defaultSpecialistEnv hsc_env@HscEnv{..} =
     SpecialistEnv
       { specialistEnvVerbosity =
           Silent
-      , specialistEnvInputSpecsFile =
-          logFlagsToDumpSpecsFile (logFlags hsc_logger)
+      -- , specialistEnvInputSpecsFile =
+      --     logFlagsToDumpSpecsFile (logFlags hsc_logger)
       , specialistEnvSampleProb =
           0.01
       , specialistEnvHscEnv =
@@ -63,8 +64,8 @@ mkSpecialistEnv hsc_env opts = do
 
         -- Any other argument means the user is overriding the location of dump
         -- output to read for this module
-        file ->
-          env { specialistEnvInputSpecsFile = file }
+        -- file ->
+        --   env { specialistEnvInputSpecsFile = file }
 
 logFlagsToDumpSpecsFile :: LogFlags -> FilePath
 logFlagsToDumpSpecsFile log_flags =
@@ -80,8 +81,8 @@ initSpecialistState
   -> SpecialistEnv
   -> IO SpecialistState
 initSpecialistState curMod cc_state env = do
-    let input_specs_file = specialistEnvInputSpecsFile env
-    input_specs <- readDumpSpecInfosToMap env input_specs_file
+    -- let input_specs_file = specialistEnvInputSpecsFile env
+    -- input_specs <- readDumpSpecInfosToMap env input_specs_file
     uniqSupply <- mkSplitUniqSupply 'z'
     return $
       SpecialistState
@@ -90,7 +91,7 @@ initSpecialistState curMod cc_state env = do
         , specialistStateLocalCcs = Set.empty
         , specialistStateCostCentreState = cc_state
         , specialistStateUniqSupply = uniqSupply
-        , specialistStateInputSpecs = input_specs
+        -- , specialistStateInputSpecs = input_specs
         , specialistStateOverloadedCallCount = 0
         , specialistStateIORefBinds = []
         }
@@ -98,6 +99,9 @@ initSpecialistState curMod cc_state env = do
 -- | Reads the 'DumpSpecInfo's from the dump file at the given file path and
 -- creates a map indexed by the name of the function that has a specialisation
 -- generated.
+--
+-- TODO: Not merged in GHC.
+{-
 readDumpSpecInfosToMap
   :: MonadIO m
   => SpecialistEnv
@@ -122,3 +126,4 @@ readDumpSpecInfosToMap env dump_file = liftIO $ do
       -> Map Text (DumpSpecInfo Text Text Text)
       -> Map Text (DumpSpecInfo Text Text Text)
     _go info@DumpSpecInfo{..} = Map.insert dumpSpecInfo_polyId info
+-}

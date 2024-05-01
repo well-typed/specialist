@@ -58,6 +58,7 @@ library
     , ghc
     , ghc-events
     , ghc-heap
+    , ghc-internal
     , hs-speedscope
     , mtl
     , random
@@ -81,7 +82,6 @@ executable specialyze
 
     , containers
     , dir-traverse
-    , ghc
     , optparse-applicative
     , text
 

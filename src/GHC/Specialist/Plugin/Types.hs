@@ -9,17 +9,20 @@ import GHC.Specialist.Plugin.Orphans ()
 import Control.Monad.Reader
 import Control.Monad.State.Strict
 import Data.Kind
-import Data.Map (Map)
+-- Only imported for unimplemented DumpSpecInfo tracking
+-- import Data.Map (Map)
 import Data.Maybe
 import Data.Set (Set)
-import Data.Text (Text)
+-- Only imported for unimplemented DumpSpecInfo tracking
+-- import Data.Text (Text)
 import Data.Word
-import GHC.InfoProv
+import GHC.Internal.InfoProv
+import GHC.Internal.ClosureTypes
 import GHC.Plugins
 import GHC.Tc.Utils.Env
 import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
-import GHC.Types.DumpSpecInfo
+-- import GHC.Types.DumpSpecInfo
 import GHC.Types.TyThing
 
 -------------------------------------------------------------------------------
@@ -64,6 +67,7 @@ prettyInfoProvFileSpan :: InfoProv -> String
 prettyInfoProvFileSpan InfoProv{..} = ipSrcFile ++ ":" ++ ipSrcSpan
 
 -- This should probably just be derived in GHC
+deriving instance Read ClosureType
 deriving instance Read InfoProv
 
 data DictInfo =
@@ -119,7 +123,7 @@ data Dict (c :: Constraint) where
 data SpecialistEnv =
     SpecialistEnv
       { specialistEnvVerbosity :: !Verbosity
-      , specialistEnvInputSpecsFile :: !FilePath
+      -- , specialistEnvInputSpecsFile :: !FilePath
       , specialistEnvSampleProb :: !Double
       , specialistEnvHscEnv :: !HscEnv
       , specialistEnvCostCenters :: !Bool
@@ -132,7 +136,7 @@ data SpecialistState =
       , specialistStateLocalCcs :: !(Set CostCentre)
       , specialistStateCostCentreState :: CostCentreState
       , specialistStateUniqSupply :: UniqSupply
-      , specialistStateInputSpecs :: !(Map Text (DumpSpecInfo Text Text Text))
+      -- , specialistStateInputSpecs :: !(Map Text (DumpSpecInfo Text Text Text))
       , specialistStateOverloadedCallCount :: !Integer
       , specialistStateIORefBinds :: [CoreBind]
       }

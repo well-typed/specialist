@@ -14,6 +14,7 @@ import Control.Monad
 import Data.List
 import Debug.Trace
 import GHC.Exts
+import GHC.Internal.Exts
 import GHC.Exts.Heap
 import GHC.InfoProv
 import GHC.IORef
@@ -49,17 +50,7 @@ getDictInfo (box@(Box dict), prettyType) = do
         \case
           ConstrClosure _ ptrs _ _ _ dcon_nm | 'C':':':cls_nm <- dcon_nm -> do
             wf <- whereFrom dict
-
-            let
-              -- If the class name of this closure is found in ptr closures,
-              -- assume it is actually a class function, not a superclass
-              --
-              -- cls_nm will look like "C:Eq_Main_0_con_info" and we want to
-              -- filter out references to things like "$fEqX_$c==_info", so we
-              -- look for the "Eq"
-              filt InfoProv{..} = not $ takeWhile (/= '_') cls_nm `isInfixOf` ipName
-
-            frees <- catMaybes <$> mapM (go filt) ptrs
+            frees <- catMaybes <$> mapM (go (classNameFilt cls_nm)) ptrs
             return $ DictClosure wf frees
           FunClosure _ ptrs _ -> do
             -- Assume this is a single method dictionary, which is actually just
@@ -90,24 +81,23 @@ getDictInfo (box@(Box dict), prettyType) = do
         \case
           ConstrClosure _ ptrs _ _ _ dcon_nm | 'C':':':cls_nm <- dcon_nm -> do
             wf <- whereFrom d
-
-            let
-              -- If the class name of this closure is found in ptr closures,
-              -- assume it is actually a class function, not a superclass
-              --
-              -- cls_nm will look like "C:Eq_Main_0_con_info" and we want to
-              -- filter out references to things like "$fEqX_$c==_info", so we
-              -- look for the "Eq"
-              filt InfoProv{..} = not $ takeWhile (/= '_') cls_nm `isInfixOf` ipName
-
-            frees <- catMaybes <$> mapM (go filt) ptrs
+            frees <- catMaybes <$> mapM (go (classNameFilt cls_nm)) ptrs
             return $ Just (DictClosure wf frees)
           FunClosure _ ptrs _ -> do
             -- Assume this is a single method dictionary, which is actually just
             -- the function
             --
             -- If the filter is "False", then we assume this is a function
-            -- referenced by a record dictionary, so we don't want to keep it
+            -- referenced by a dictionary, so we don't want to keep it
+            --
+            -- TODO: Differentiating single-method type class dictionaries and
+            -- regular functions is difficult to do precisely, and this doesn't
+            -- properly do it. We still get a lot of false positives (regular
+            -- functions considered dictionaries). I think it is better to err
+            -- on this side for now, but we should figure out how to be a bit
+            -- more precise with it. Ideas: Are single method type class
+            -- dictionaries ever given "sat_" names? If not, we could filter on
+            -- those too.
             wf <- whereFrom d
             if maybe True ipeFilt wf then do
               frees <- catMaybes <$> mapM (go (const True)) ptrs
@@ -146,6 +136,16 @@ getDictInfo (box@(Box dict), prettyType) = do
           _c -> do
             return Nothing
 
+    -- If the class name of this closure is found in ptr closures, assume it is
+    -- actually a class function, not a superclass
+    --
+    -- className will look like "Eq_Main_0_con_info" and we want to filter out
+    -- references to things like "$fEqX_$c==_info", so we look for the "Eq".
+    -- We also attempt to filter references to other non-dictionaries by
+    classNameFilt :: String -> InfoProv -> Bool
+    classNameFilt className InfoProv{..} =
+        not $ takeWhile (/= '_') className `isInfixOf` ipName
+
 {-# NOINLINE specialistWrapper' #-}
 specialistWrapper' :: forall a r (b :: TYPE r).
      Double
@@ -164,7 +164,7 @@ specialistWrapper' sampleProb hasSampledRef fIdAddr lAddr ssAddr f boxedDicts =
         traceEventIO . show =<<
           SpecialistNote (unpackCString# fIdAddr)
             <$> currentCallStack
-            <*> (reverse <$> currentCallStackIds)
+            <*> (reverse . map fromIntegral <$> currentCallStackIds)
             <*> mapM getDictInfo boxedDicts
             <*> whereFrom f
             <*> pure (unpackCString# lAddr)
