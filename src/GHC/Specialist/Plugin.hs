@@ -36,7 +36,7 @@ plugin =
     defaultPlugin
       { latePlugin = \hsc_env opts (cgs, cc_state) -> do
           specialistEnv <- mkSpecialistEnv hsc_env opts
-          specialistState <- initSpecialistState (cg_module cgs) cc_state specialistEnv
+          specialistState <- initSpecialistState (cg_module cgs) cc_state
           evalSpecialist
             specialistEnv
             specialistState
@@ -360,7 +360,8 @@ processExpr = \case
               f_srcspan_maybe = nameSrcSpan <$> f_name_maybe
               cc_id_fs =
                 fsLit $
-                  maybe "(no name available)" getOccString f_name_maybe
+                  maybe "(no name available)" getOccString f_name_maybe ++
+                  " (call id " ++ uniqId ++ ")"
 
             -- Cost centre index
             -- Note: This should always be zero, since we include the unique call
